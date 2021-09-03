@@ -1,0 +1,1407 @@
+---
+title: "Información OPS"
+author: "Área de Información - Sinae"
+date: "`r format(Sys.time(), '%d %B de %Y')`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+subtitle: Centros de cuidados críticos en Uruguay
+theme: zenburn
+header-includes:
+  - \usepackage{graphicx}
+  - \geometry{paper=a4paper,left=30mm, right=30mm, top=40mm, bottom=40mm, headheight=3.2cm, footskip=3cm}
+  - \usepackage{fancyhdr}
+  - \fancyhfoffset[L]{3cm}
+  - \fancyhfoffset[R]{3cm}
+  - \fancypagestyle{plain}{
+  - \renewcommand{\headrulewidth}{0pt}
+  - \renewcommand{\footrulewidth}{0pt}
+  - \chead{\includegraphics[width=2551px]{Mira Logo.png}}
+  - \cfoot{\includegraphics[width=2551px]{pie de página.png}}}
+  - \pagestyle{fancy}
+  - \renewcommand{\headrulewidth}{0pt}
+  - \renewcommand{\footrulewidth}{0pt}
+  - \chead{\includegraphics[width=2551px]{Mira Logo.png}}
+  - \cfoot{\includegraphics[width=2551px]{pie de página.png}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(datos)
+library(lubridate)
+library(ggplot2)
+library(data.table)
+library(kableExtra)
+library(tinytex)
+library(matrixStats)
+
+setwd("C:\\Users\\User\\Documents\\02_SINAE\\CTI\\Bases")
+dato <- read.csv("Base\\centrosdeasistenciaii_history_20210823.csv", sep = ";", encoding = "UTF-8")
+base_total <- subset(dato, (nombre != "CTI_test" & 
+                      nombre != "UDELAR CENAQUE" &    
+                      nombre != "SANATORIO URUGUAY" &
+                      nombre != "GREMCA"))
+
+base <- select(base_total, c(nombre, last_edited_date,	servicios, departamen, localidad,
+                             direccion,	tipo,	categoria,	prestador,	calle,	numero, cam_tot_disp_inst, 
+                               cam_cti_libres, cam_cti_hab, cam_cti_bloq, cam_cti_ocu_tot, cam_cti_ocu_rag,
+                               cam_cti_ocu_covid19, cam_cti_ocu_otro, cam_cti_amp,
+                              cam_ci_libres, cam_ci_hab, cam_ci_bloq, cam_ci_ocu_tot, cam_ci_ocu_rag, 
+                              cam_ci_ocu_covid19, cam_ci_ocu_otro, cam_ci_amp, 
+                             cam_ic_libres, cam_ic_hab, cam_ic_bloq, cam_ic_ocu_tot, cam_ic_ocu_rag,
+                             cam_ic_ocu_covid19, cam_ic_ocu_otro, cam_cti_libres_ais_resp, cam_ci_libres_ais_resp,
+                             vent_cant_oaf, vent_cant_vni, vent_cant_total))
+
+base$last_edited_date <- as.POSIXct(as.character(base$last_edited_date, format="%m/%d/%Y %H:%M:%S"))
+tz(base$last_edited_date)<-"GMT"
+attributes(base$last_edited_date)$tzone <- "America/Montevideo" 
+
+#base$last_edited_date <- base$last_edited_date - (60*60*3) #3 horas por diferencia de servidor
+base <- subset(base, last_edited_date >= "2021-01-01 00:00:00")
+base$Fecha <- lubridate::as_date(base$last_edited_date)
+base <- base[order(base$last_edited_date), ]
+
+```
+
+
+```{r, echo=FALSE}
+
+base$nombre[base$nombre == "ASSE Treinta y Tres"] <- "ASSE TREINTA y TRES"
+base$nombre[base$nombre == "HOSPTIAL POLICIAL"] <- "HOSPITAL POLICIAL"
+base$nombre[base$nombre == "Comero IAMPP"] <- "COMERO IAMPP"
+base$nombre[base$nombre == "ASOCIACION ESPA<U+00D1>OLA"] <- "ASOCIACION ESPAÑOLA"
+base$nombre[base$nombre == "ASSE ESPA<U+00D1>OL"] <- "ASSE ESPAÑOL"
+
+
+```
+
+```{r Departamento_servicio_localidad interior, echo=FALSE}
+base$departamen[base$nombre == "GREMEDA IAMPP"] <- "Artigas"
+base$servicios[base$nombre == "GREMEDA IAMPP"] <- "Privado"
+base$localidad[base$nombre == "GREMEDA IAMPP"] <- "Artigas"
+
+base$departamen[base$nombre == "ASSE LAS PIEDRAS"] <- "Canelones"
+base$servicios[base$nombre == "ASSE LAS PIEDRAS"] <- "Público"
+base$localidad[base$nombre == "ASSE LAS PIEDRAS"] <- "Las Piedras"
+
+base$departamen[base$nombre == "CRAMI"] <- "Canelones"
+base$servicios[base$nombre == "CRAMI"] <- "Privado"
+base$localidad[base$nombre == "CRAMI"] <- "Las Piedras"
+
+base$departamen[base$nombre == "CAAMEPA IAMPP"] <- "Canelones"
+base$servicios[base$nombre == "CAAMEPA IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAAMEPA IAMPP"] <- "Pando"
+
+base$departamen[base$nombre == "COMECA IAMPP"] <- "Canelones"
+base$servicios[base$nombre == "COMECA IAMPP"] <- "Privado"
+base$localidad[base$nombre == "COMECA IAMPP"] <- "Canelones"
+
+base$departamen[base$nombre == "CAMCEL"] <- "Cerro Largo"
+base$servicios[base$nombre == "CAMCEL"] <- "Privado"
+base$localidad[base$nombre == "CAMCEL"] <- "Melo"
+
+base$departamen[base$nombre == "CAMEC"] <- "Colonia"
+base$servicios[base$nombre == "CAMEC"] <- "Privado"
+base$localidad[base$nombre == "CAMEC"] <- "Colonia"
+
+base$departamen[base$nombre == "ASSE COLONIA"] <- "Colonia"
+base$servicios[base$nombre == "ASSE COLONIA"] <- "Público"
+base$localidad[base$nombre == "ASSE COLONIA"] <- "Colonia"
+
+base$departamen[base$nombre == "CAMEC-IAMPP"] <- "Colonia"
+base$servicios[base$nombre == "CAMEC-IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAMEC-IAMPP"] <- "Rosario"
+
+base$departamen[base$nombre == "CAMOC IAMPP"] <- "Colonia"
+base$servicios[base$nombre == "CAMOC IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAMOC IAMPP"] <- "Carmelo"
+
+base$departamen[base$nombre == "CAMEDUR"] <- "Durazno"
+base$servicios[base$nombre == "CAMEDUR"] <- "Privado"
+base$localidad[base$nombre == "CAMEDUR"] <- "Durazno"
+
+base$departamen[base$nombre == "ASSE FLORIDA"] <- "Florida"
+base$servicios[base$nombre == "ASSE FLORIDA"] <- "Público"
+base$localidad[base$nombre == "ASSE FLORIDA"] <- "Florida"
+
+base$departamen[base$nombre == "COMEF"] <- "Florida"
+base$servicios[base$nombre == "COMEF"] <- "Privado"
+base$localidad[base$nombre == "COMEF"] <- "Florida"
+
+base$departamen[base$nombre == "ASSE LAVALLEJA"] <- "Lavalleja"
+base$servicios[base$nombre == "ASSE LAVALLEJA"] <- "Público"
+base$localidad[base$nombre == "ASSE LAVALLEJA"] <- "Minas"
+
+base$departamen[base$nombre == "CAMDEL IAMPP"] <- "Lavalleja"
+base$servicios[base$nombre == "CAMDEL IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAMDEL IAMPP"] <- "Minas"
+
+base$departamen[base$nombre == "AMDM IAMPP"] <- "Maldonado"
+base$servicios[base$nombre == "AMDM IAMPP"] <- "Privado"
+base$localidad[base$nombre == "AMDM IAMPP"] <- "Punta del Este"
+
+base$departamen[base$nombre == "ASSE MALDONADO"] <- "Maldonado"
+base$servicios[base$nombre == "ASSE MALDONADO"] <- "Público"
+base$localidad[base$nombre == "ASSE MALDONADO"] <- "Maldonado"
+
+base$departamen[base$nombre == "CRAME"] <- "Maldonado"
+base$servicios[base$nombre == "CRAME"] <- "Privado"
+base$localidad[base$nombre == "CRAME"] <- "Maldonado"
+
+base$departamen[base$nombre == "ASSE PAYSANDU"] <- "Paysandú"
+base$servicios[base$nombre == "ASSE PAYSANDU"] <- "Público"
+base$localidad[base$nombre == "ASSE PAYSANDU"] <- "Paysandú"
+
+base$departamen[base$nombre == "COMEPA"] <- "Paysandú"
+base$servicios[base$nombre == "COMEPA"] <- "Privado"
+base$localidad[base$nombre == "COMEPA"] <- "Paysandú"
+
+base$departamen[base$nombre == "CAMY IAMPP"] <- "Río Negro"
+base$servicios[base$nombre == "CAMY IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAMY IAMPP"] <- "Young"
+
+base$departamen[base$nombre == "AMEDRIN"] <- "Río Negro"
+base$servicios[base$nombre == "AMEDRIN"] <- "Privado"
+base$localidad[base$nombre == "AMEDRIN"] <- "Fray Bentos"
+
+base$departamen[base$nombre == "ASSE RIVERA"] <- "Rivera"
+base$servicios[base$nombre == "ASSE RIVERA"] <- "Público"
+base$localidad[base$nombre == "ASSE RIVERA"] <- "Rivera"
+
+base$departamen[base$nombre == "CASMER IAMPP"] <- "Rivera"
+base$servicios[base$nombre == "CASMER IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CASMER IAMPP"] <- "Rivera"
+
+base$departamen[base$nombre == "COMERI"] <- "Rivera"
+base$servicios[base$nombre == "COMERI"] <- "Privado"
+base$localidad[base$nombre == "COMERI"] <- "Rivera"
+
+base$departamen[base$nombre == "COMERO IAMPP"] <- "Rocha"
+base$servicios[base$nombre == "COMERO IAMPP"] <- "Privado"
+base$localidad[base$nombre == "COMERO IAMPP"] <- "Rocha"
+
+base$departamen[base$nombre == "ASSE SALTO"] <- "Salto"
+base$servicios[base$nombre == "ASSE SALTO"] <- "Público"
+base$localidad[base$nombre == "ASSE SALTO"] <- "Salto"
+
+base$departamen[base$nombre == "SANATORIO PANAMERICANO"] <- "Salto"
+base$servicios[base$nombre == "SANATORIO PANAMERICANO"] <- "Privado"
+base$localidad[base$nombre == "SANATORIO PANAMERICANO"] <- "Salto"
+
+base$departamen[base$nombre == "AMSJ IAMPP"] <- "San José"
+base$servicios[base$nombre == "AMSJ IAMPP"] <- "Privado"
+base$localidad[base$nombre == "AMSJ IAMPP"] <- "San José de Mayo"
+
+base$departamen[base$nombre == "CAMS - IAMPP"] <- "Soriano"
+base$servicios[base$nombre == "CAMS - IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAMS - IAMPP"] <- "Mercedes"
+
+base$departamen[base$nombre == "ASSE TACUAREMBO"] <- "Tacuarembó"
+base$servicios[base$nombre == "ASSE TACUAREMBO"] <- "Público"
+base$localidad[base$nombre == "ASSE TACUAREMBO"] <- "Tacuarembó"
+
+base$departamen[base$nombre == "COMTA"] <- "Tacuarembó"
+base$servicios[base$nombre == "COMTA"] <- "Privado"
+base$localidad[base$nombre == "COMTA"] <- "Tacuarembó"
+
+base$departamen[base$nombre == "ASSE TREINTA y TRES"] <- "Treinta y Tres"
+base$servicios[base$nombre == "ASSE TREINTA y TRES"] <- "Público"
+base$localidad[base$nombre == "ASSE TREINTA y TRES"] <- "Treinta y Tres"
+
+base$departamen[base$nombre == "IAC"] <- "Treinta y Tres"
+base$servicios[base$nombre == "IAC"] <- "Privado"
+base$localidad[base$nombre == "IAC"] <- "Treinta y Tres"
+
+```
+
+```{r Departamento_servicio_localidad montevideo, echo=FALSE}
+
+base$departamen[base$nombre == "ASOCIACION ESPAÑOLA"] <- "Montevideo"
+base$servicios[base$nombre == "ASOCIACION ESPAÑOLA"] <- "Privado"
+base$localidad[base$nombre == "ASOCIACION ESPAÑOLA"] <- "Montevideo"
+
+base$departamen[base$nombre == "ASSE - CENTRO HOSPITALARIO PEREIRA ROSSELL"] <- "Montevideo"
+base$servicios[base$nombre == "ASSE - CENTRO HOSPITALARIO PEREIRA ROSSELL"] <- "Público"
+base$localidad[base$nombre == "ASSE - CENTRO HOSPITALARIO PEREIRA ROSSELL"] <- "Montevideo"
+
+base$departamen[base$nombre == "ASSE ESPAÑOL"] <- "Montevideo"
+base$servicios[base$nombre == "ASSE ESPAÑOL"] <- "Público"
+base$localidad[base$nombre == "ASSE ESPAÑOL"] <- "Montevideo"
+
+base$departamen[base$nombre == "ASSE INOT"] <- "Montevideo"
+base$servicios[base$nombre == "ASSE INOT"] <- "Público"
+base$localidad[base$nombre == "ASSE INOT"] <- "Montevideo"
+
+base$departamen[base$nombre == "ASSE MACIEL"] <- "Montevideo"
+base$servicios[base$nombre == "ASSE MACIEL"] <- "Público"
+base$localidad[base$nombre == "ASSE MACIEL"] <- "Montevideo"
+
+base$departamen[base$nombre == "ASSE PASTEUR"] <- "Montevideo"
+base$servicios[base$nombre == "ASSE PASTEUR"] <- "Público"
+base$localidad[base$nombre == "ASSE PASTEUR"] <- "Montevideo"
+
+base$departamen[base$nombre == "CASA DE GALICIA"] <- "Montevideo"
+base$servicios[base$nombre == "CASA DE GALICIA"] <- "Privado"
+base$localidad[base$nombre == "CASA DE GALICIA"] <- "Montevideo"
+
+base$departamen[base$nombre == "CASMU - SANATORIO 3"] <- "Montevideo"
+base$servicios[base$nombre == "CASMU - SANATORIO 3"] <- "Privado"
+base$localidad[base$nombre == "CASMU - SANATORIO 3"] <- "Montevideo"
+
+base$departamen[base$nombre == "CASMU-IAMPP"] <- "Montevideo"
+base$servicios[base$nombre == "CASMU-IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CASMU-IAMPP"] <- "Montevideo"
+
+base$departamen[base$nombre == "CCOU"] <- "Montevideo"
+base$servicios[base$nombre == "CCOU"] <- "Privado"
+base$localidad[base$nombre == "CCOU"] <- "Montevideo"
+
+base$departamen[base$nombre == "CUDAM"] <- "Montevideo"
+base$servicios[base$nombre == "CUDAM"] <- "Privado"
+base$localidad[base$nombre == "CUDAM"] <- "Montevideo"
+
+base$departamen[base$nombre == "HOSPITAL BRITANICO"] <- "Montevideo"
+base$servicios[base$nombre == "HOSPITAL BRITANICO"] <- "Privado"
+base$localidad[base$nombre == "HOSPITAL BRITANICO"] <- "Montevideo"
+
+base$departamen[base$nombre == "HOSPITAL CENTRAL FF.AA."] <- "Montevideo"
+base$servicios[base$nombre == "HOSPITAL CENTRAL FF.AA."] <- "Público"
+base$localidad[base$nombre == "HOSPITAL CENTRAL FF.AA."] <- "Montevideo"
+
+base$departamen[base$nombre == "HOSPITAL EVANGELICO"] <- "Montevideo"
+base$servicios[base$nombre == "HOSPITAL EVANGELICO"] <- "Privado"
+base$localidad[base$nombre == "HOSPITAL EVANGELICO"] <- "Montevideo"
+
+base$departamen[base$nombre == "HOSPITAL POLICIAL"] <- "Montevideo"
+base$servicios[base$nombre == "HOSPITAL POLICIAL"] <- "Público"
+base$localidad[base$nombre == "HOSPITAL POLICIAL"] <- "Montevideo"
+
+base$departamen[base$nombre == "MUCAM"] <- "Montevideo"
+base$servicios[base$nombre == "MUCAM"] <- "Privado"
+base$localidad[base$nombre == "MUCAM"] <- "Montevideo"
+
+base$departamen[base$nombre == "SANATORIO AMERICANO"] <- "Montevideo"
+base$servicios[base$nombre == "SANATORIO AMERICANO"] <- "Privado"
+base$localidad[base$nombre == "SANATORIO AMERICANO"] <- "Montevideo"
+
+base$departamen[base$nombre == "SMI"] <- "Montevideo"
+base$servicios[base$nombre == "SMI"] <- "Privado"
+base$localidad[base$nombre == "SMI"] <- "Montevideo"
+
+base$departamen[base$nombre == "UDELAR"] <- "Montevideo"
+base$servicios[base$nombre == "UDELAR"] <- "Público"
+base$localidad[base$nombre == "UDELAR"] <- "Montevideo"
+
+base$departamen[base$nombre == "UNIVERSAL"] <- "Montevideo"
+base$servicios[base$nombre == "UNIVERSAL"] <- "Privado"
+base$localidad[base$nombre == "UNIVERSAL"] <- "Montevideo"
+
+
+```
+
+```{r ordenar, echo=FALSE}
+
+base <- base[order(base$last_edited_date), ]
+
+write.csv2(base, file="base_total.csv", row.names = F)
+
+```
+
+```{r rellenar, echo=FALSE}
+
+base_GREMEDA_IAMPP <- base[base$nombre == "GREMEDA IAMPP", ]
+base_GREMEDA_IAMPP <- base_GREMEDA_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_GREMEDA_IAMPP <- fill(base_GREMEDA_IAMPP, colnames(base_GREMEDA_IAMPP))
+for(i in 1:nrow(base_GREMEDA_IAMPP )){
+  suma_na<-0
+  for (j in 2: ncol(base_GREMEDA_IAMPP )){
+    if (is.na(base_GREMEDA_IAMPP [i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_GREMEDA_IAMPP )-1)){
+    base_GREMEDA_IAMPP[i,-1] <- base_GREMEDA_IAMPP[i-1,-1]
+  }
+}
+
+base_COMECA_IAMPP <- base[base$nombre == "COMECA IAMPP", ]
+base_COMECA_IAMPP <- base_COMECA_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMECA_IAMPP <- fill(base_COMECA_IAMPP, colnames(base_COMECA_IAMPP))
+for(i in 1:nrow(base_COMECA_IAMPP )){
+  suma_na<-0
+  for (j in 2: ncol(base_COMECA_IAMPP )){
+    if (is.na(base_COMECA_IAMPP [i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMECA_IAMPP)-1)){
+    base_COMECA_IAMPP[i,-1] <- base_COMECA_IAMPP[i-1,-1]
+  }
+}
+
+base_CRAMI <- base[base$nombre == "CRAMI", ]
+base_CRAMI <- base_CRAMI %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CRAMI <- fill(base_CRAMI, colnames(base_CRAMI))
+for(i in 1:nrow(base_CRAMI)){
+  suma_na<-0
+  for (j in 2: ncol(base_CRAMI)){
+    if (is.na(base_CRAMI[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CRAMI)-1)){
+    base_CRAMI[i,-1] <- base_CRAMI[i-1,-1]
+  }
+}
+
+base_CAAMEPA_IAMPP <- base[base$nombre == "CAAMEPA IAMPP", ]
+base_CAAMEPA_IAMPP <- base_CAAMEPA_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAAMEPA_IAMPP <- fill(base_CAAMEPA_IAMPP, colnames(base_CAAMEPA_IAMPP))
+for(i in 1:nrow(base_CAAMEPA_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAAMEPA_IAMPP)){
+    if (is.na(base_CAAMEPA_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAAMEPA_IAMPP)-1)){
+    base_CAAMEPA_IAMPP[i,-1] <- base_CAAMEPA_IAMPP[i-1,-1]
+  }
+}
+
+base_ASSE_LAS_PIEDRAS <- base[base$nombre == "ASSE LAS PIEDRAS", ]
+base_ASSE_LAS_PIEDRAS <- base_ASSE_LAS_PIEDRAS %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_LAS_PIEDRAS <- fill(base_ASSE_LAS_PIEDRAS, colnames(base_ASSE_LAS_PIEDRAS))
+for(i in 1:nrow(base_ASSE_LAS_PIEDRAS)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_LAS_PIEDRAS)){
+    if (is.na(base_ASSE_LAS_PIEDRAS[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_LAS_PIEDRAS)-1)){
+    base_ASSE_LAS_PIEDRAS[i,-1] <- base_ASSE_LAS_PIEDRAS[i-1,-1]
+  }
+}
+
+base_CAMCEL <- base[base$nombre == "CAMCEL", ]
+base_CAMCEL <- base_CAMCEL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMCEL <- fill(base_CAMCEL, colnames(base_CAMCEL))
+for(i in 1:nrow(base_CAMCEL)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMCEL)){
+    if (is.na(base_CAMCEL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMCEL)-1)){
+    base_CAMCEL[i,-1] <- base_CAMCEL[i-1,-1]
+  }
+}
+
+base_CAMEC <- base[base$nombre == "CAMEC", ]
+base_CAMEC <- base_CAMEC %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMEC <- fill(base_CAMEC, colnames(base_CAMEC))
+for(i in 1:nrow(base_CAMEC)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMEC)){
+    if (is.na(base_CAMEC[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMEC)-1)){
+    base_CAMEC[i,-1] <- base_CAMEC[i-1,-1]
+  }
+}
+
+base_ASSE_COLONIA <- base[base$nombre == "ASSE COLONIA", ]
+base_ASSE_COLONIA <- base_ASSE_COLONIA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_COLONIA <- fill(base_ASSE_COLONIA, colnames(base_ASSE_COLONIA))
+for(i in 1:nrow(base_ASSE_COLONIA)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_COLONIA)){
+    if (is.na(base_ASSE_COLONIA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_COLONIA)-1)){
+    base_ASSE_COLONIA[i,-1] <- base_ASSE_COLONIA[i-1,-1]
+  }
+}
+
+base_CAMEC_IAMPP <- base[base$nombre == "CAMEC-IAMPP", ]
+base_CAMEC_IAMPP <- base_CAMEC_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMEC_IAMPP <- fill(base_CAMEC_IAMPP, colnames(base_CAMEC_IAMPP))
+for(i in 1:nrow(base_CAMEC_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMEC_IAMPP)){
+    if (is.na(base_CAMEC_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMEC_IAMPP)-1)){
+    base_CAMEC_IAMPP[i,-1] <- base_CAMEC_IAMPP[i-1,-1]
+  }
+}
+
+base_CAMOC_IAMPP <- base[base$nombre == "CAMOC IAMPP", ]
+base_CAMOC_IAMPP <- base_CAMOC_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMOC_IAMPP <- fill(base_CAMOC_IAMPP, colnames(base_CAMOC_IAMPP))
+for(i in 1:nrow(base_CAMOC_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMOC_IAMPP)){
+    if (is.na(base_CAMOC_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMOC_IAMPP)-1)){
+    base_CAMOC_IAMPP[i,-1] <- base_CAMOC_IAMPP[i-1,-1]
+  }
+}
+
+base_CAMEDUR <- base[base$nombre == "CAMEDUR", ]
+base_CAMEDUR <- base_CAMEDUR %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMEDUR <- fill(base_CAMEDUR, colnames(base_CAMEDUR))
+for(i in 1:nrow(base_CAMEDUR)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMEDUR)){
+    if (is.na(base_CAMEDUR[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMEDUR)-1)){
+    base_CAMEDUR[i,-1] <- base_CAMEDUR[i-1,-1]
+  }
+}
+
+base_COMEF <- base[base$nombre == "COMEF", ]
+base_COMEF <- base_COMEF %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMEF <- fill(base_COMEF, colnames(base_COMEF))
+for(i in 1:nrow(base_COMEF)){
+  suma_na<-0
+  for (j in 2: ncol(base_COMEF)){
+    if (is.na(base_COMEF[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMEF)-1)){
+    base_COMEF[i,-1] <- base_COMEF[i-1,-1]
+  }
+}
+
+base_ASSE_FLORIDA <- base[base$nombre == "ASSE FLORIDA", ]
+base_ASSE_FLORIDA <- base_ASSE_FLORIDA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_FLORIDA <- fill(base_ASSE_FLORIDA, colnames(base_ASSE_FLORIDA))
+for(i in 1:nrow(base_ASSE_FLORIDA)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_FLORIDA)){
+    if (is.na(base_ASSE_FLORIDA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_FLORIDA)-1)){
+    base_ASSE_FLORIDA[i,-1] <- base_ASSE_FLORIDA[i-1,-1]
+  }
+}
+
+base_CAMDEL_IAMPP <- base[base$nombre == "CAMDEL IAMPP", ]
+base_CAMDEL_IAMPP <- base_CAMDEL_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMDEL_IAMPP <- fill(base_CAMDEL_IAMPP, colnames(base_CAMDEL_IAMPP))
+for(i in 1:nrow(base_CAMDEL_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMDEL_IAMPP)){
+    if (is.na(base_CAMDEL_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMDEL_IAMPP)-1)){
+    base_CAMDEL_IAMPP[i,-1] <- base_CAMDEL_IAMPP[i-1,-1]
+  }
+}
+
+base_ASSE_LAVALLEJA <- base[base$nombre == "ASSE LAVALLEJA", ]
+base_ASSE_LAVALLEJA <- base_ASSE_LAVALLEJA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_LAVALLEJA <- fill(base_ASSE_LAVALLEJA, colnames(base_ASSE_LAVALLEJA))
+for(i in 1:nrow(base_ASSE_LAVALLEJA)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_LAVALLEJA)){
+    if (is.na(base_ASSE_LAVALLEJA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_LAVALLEJA)-1)){
+    base_ASSE_LAVALLEJA[i,-1] <- base_ASSE_LAVALLEJA[i-1,-1]
+  }
+}
+
+base_CRAME <- base[base$nombre == "CRAME", ]
+base_CRAME <- base_CRAME %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CRAME <- fill(base_CRAME, colnames(base_CRAME))
+for(i in 1:nrow(base_CRAME)){
+  suma_na<-0
+  for (j in 2: ncol(base_CRAME)){
+    if (is.na(base_CRAME[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CRAME)-1)){
+    base_CRAME[i,-1] <- base_CRAME[i-1,-1]
+  }
+}
+
+base_AMDM_IAMPP <- base[base$nombre == "AMDM IAMPP", ]
+base_AMDM_IAMPP <- base_AMDM_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_AMDM_IAMPP <- fill(base_AMDM_IAMPP, colnames(base_AMDM_IAMPP))
+for(i in 1:nrow(base_AMDM_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_AMDM_IAMPP)){
+    if (is.na(base_AMDM_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_AMDM_IAMPP)-1)){
+    base_AMDM_IAMPP[i,-1] <- base_AMDM_IAMPP[i-1,-1]
+  }
+}
+
+base_ASSE_MALDONADO <- base[base$nombre == "ASSE MALDONADO", ]
+base_ASSE_MALDONADO <- base_ASSE_MALDONADO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_MALDONADO <- fill(base_ASSE_MALDONADO, colnames(base_ASSE_MALDONADO))
+for(i in 1:nrow(base_ASSE_MALDONADO)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_MALDONADO)){
+    if (is.na(base_ASSE_MALDONADO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_MALDONADO)-1)){
+    base_ASSE_MALDONADO[i,-1] <- base_ASSE_MALDONADO[i-1,-1]
+  }
+}
+
+base_CASA_DE_GALICIA <- base[base$nombre == "CASA DE GALICIA", ]
+base_CASA_DE_GALICIA <- base_CASA_DE_GALICIA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CASA_DE_GALICIA <- fill(base_CASA_DE_GALICIA, colnames(base_CASA_DE_GALICIA))
+for(i in 1:nrow(base_CASA_DE_GALICIA)){
+  suma_na<-0
+  for (j in 2: ncol(base_CASA_DE_GALICIA)){
+    if (is.na(base_CASA_DE_GALICIA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CASA_DE_GALICIA)-1)){
+    base_CASA_DE_GALICIA[i,-1] <- base_CASA_DE_GALICIA[i-1,-1]
+  }
+}
+
+base_ASSE_PASTEUR <- base[base$nombre == "ASSE PASTEUR", ]
+base_ASSE_PASTEUR <- base_ASSE_PASTEUR %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_PASTEUR <- fill(base_ASSE_PASTEUR, colnames(base_ASSE_PASTEUR))
+for(i in 1:nrow(base_ASSE_PASTEUR)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_PASTEUR)){
+    if (is.na(base_ASSE_PASTEUR[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_PASTEUR)-1)){
+    base_ASSE_PASTEUR[i,-1] <- base_ASSE_PASTEUR[i-1,-1]
+  }
+}
+
+base_SANATORIO_AMERICANO <- base[base$nombre == "SANATORIO AMERICANO", ]
+base_SANATORIO_AMERICANO <- base_SANATORIO_AMERICANO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_SANATORIO_AMERICANO <- fill(base_SANATORIO_AMERICANO, colnames(base_SANATORIO_AMERICANO))
+for(i in 1:nrow(base_SANATORIO_AMERICANO)){
+  suma_na<-0
+  for (j in 2: ncol(base_SANATORIO_AMERICANO)){
+    if (is.na(base_SANATORIO_AMERICANO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_SANATORIO_AMERICANO)-1)){
+    base_SANATORIO_AMERICANO[i,-1] <- base_SANATORIO_AMERICANO[i-1,-1]
+  }
+}
+
+base_ASOCIACION_ESPAÑOLA <- base[base$nombre == "ASOCIACION ESPAÑOLA", ]
+base_ASOCIACION_ESPAÑOLA <- base_ASOCIACION_ESPAÑOLA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASOCIACION_ESPAÑOLA <- fill(base_ASOCIACION_ESPAÑOLA, colnames(base_ASOCIACION_ESPAÑOLA))
+for(i in 1:nrow(base_ASOCIACION_ESPAÑOLA)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASOCIACION_ESPAÑOLA)){
+    if (is.na(base_ASOCIACION_ESPAÑOLA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASOCIACION_ESPAÑOLA)-1)){
+    base_ASOCIACION_ESPAÑOLA[i,-1] <- base_ASOCIACION_ESPAÑOLA[i-1,-1]
+  }
+}
+
+base_CCOU <- base[base$nombre == "CCOU", ]
+base_CCOU <- base_CCOU %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CCOU <- fill(base_CCOU, colnames(base_CCOU))
+for(i in 1:nrow(base_CCOU)){
+  suma_na<-0
+  for (j in 2: ncol(base_CCOU)){
+    if (is.na(base_CCOU[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CCOU)-1)){
+   base_CCOU[i,-1] <- base_CCOU[i-1,-1]
+  }
+}
+
+base_CUDAM <- base[base$nombre == "CUDAM", ]
+base_CUDAM <- base_CUDAM %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CUDAM <- fill(base_CUDAM, colnames(base_CUDAM))
+for(i in 1:nrow(base_CUDAM)){
+  suma_na<-0
+  for (j in 2: ncol(base_CUDAM)){
+    if (is.na(base_CUDAM[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CUDAM)-1)){
+   base_CUDAM[i,-1] <- base_CUDAM[i-1,-1]
+  }
+}
+
+base_HOSPITAL_EVANGELICO <- base[base$nombre == "HOSPITAL EVANGELICO", ]
+base_HOSPITAL_EVANGELICO <- base_HOSPITAL_EVANGELICO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_HOSPITAL_EVANGELICO <- fill(base_HOSPITAL_EVANGELICO, colnames(base_HOSPITAL_EVANGELICO))
+for(i in 1:nrow(base_HOSPITAL_EVANGELICO)){
+  suma_na<-0
+  for (j in 2: ncol(base_HOSPITAL_EVANGELICO)){
+    if (is.na(base_HOSPITAL_EVANGELICO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_HOSPITAL_EVANGELICO)-1)){
+   base_HOSPITAL_EVANGELICO[i,-1] <- base_HOSPITAL_EVANGELICO[i-1,-1]
+  }
+}
+
+base_UNIVERSAL <- base[base$nombre == "UNIVERSAL", ]
+base_UNIVERSAL <- base_UNIVERSAL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_UNIVERSAL <- fill(base_UNIVERSAL, colnames(base_UNIVERSAL))
+for(i in 1:nrow(base_UNIVERSAL)){
+  suma_na<-0
+  for (j in 2: ncol(base_UNIVERSAL)){
+    if (is.na(base_UNIVERSAL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_UNIVERSAL)-1)){
+   base_UNIVERSAL[i,-1] <- base_UNIVERSAL[i-1,-1]
+  }
+}
+
+base_ASSE_ESPAÑOL <- base[base$nombre == "ASSE ESPAÑOL", ]
+base_ASSE_ESPAÑOL <- base_ASSE_ESPAÑOL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_ESPAÑOL <- fill(base_ASSE_ESPAÑOL, colnames(base_ASSE_ESPAÑOL))
+for(i in 1:nrow(base_ASSE_ESPAÑOL)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_ESPAÑOL)){
+    if (is.na(base_ASSE_ESPAÑOL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_ESPAÑOL)-1)){
+   base_ASSE_ESPAÑOL[i,-1] <- base_ASSE_ESPAÑOL[i-1,-1]
+  }
+}
+
+base_SMI <- base[base$nombre == "SMI", ]
+base_SMI <- base_SMI %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_SMI <- fill(base_SMI, colnames(base_SMI))
+for(i in 1:nrow(base_SMI)){
+  suma_na<-0
+  for (j in 2: ncol(base_SMI)){
+    if (is.na(base_SMI[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_SMI)-1)){
+   base_SMI[i,-1] <- base_SMI[i-1,-1]
+  }
+}
+
+base_UDELAR <- base[base$nombre == "UDELAR", ]
+base_UDELAR <- base_UDELAR %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_UDELAR <- fill(base_UDELAR, colnames(base_UDELAR))
+for(i in 1:nrow(base_UDELAR)){
+  suma_na<-0
+  for (j in 2: ncol(base_UDELAR)){
+    if (is.na(base_UDELAR[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_UDELAR)-1)){
+   base_UDELAR[i,-1] <- base_UDELAR[i-1,-1]
+  }
+}
+
+base_HOSPITAL_BRITANICO <- base[base$nombre == "HOSPITAL BRITANICO", ]
+base_HOSPITAL_BRITANICO <- base_HOSPITAL_BRITANICO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_HOSPITAL_BRITANICO <- fill(base_HOSPITAL_BRITANICO, colnames(base_HOSPITAL_BRITANICO))
+for(i in 1:nrow(base_HOSPITAL_BRITANICO)){
+  suma_na<-0
+  for (j in 2: ncol(base_HOSPITAL_BRITANICO)){
+    if (is.na(base_HOSPITAL_BRITANICO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_HOSPITAL_BRITANICO)-1)){
+   base_HOSPITAL_BRITANICO[i,-1] <- base_HOSPITAL_BRITANICO[i-1,-1]
+  }
+}
+
+base_HOSPITAL_CENTRAL_FF.AA. <- base[base$nombre == "HOSPITAL CENTRAL FF.AA.", ]
+base_HOSPITAL_CENTRAL_FF.AA. <- base_HOSPITAL_CENTRAL_FF.AA. %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_HOSPITAL_CENTRAL_FF.AA. <- fill(base_HOSPITAL_CENTRAL_FF.AA., colnames(base_HOSPITAL_CENTRAL_FF.AA.))
+for(i in 1:nrow(base_HOSPITAL_CENTRAL_FF.AA.)){
+  suma_na<-0
+  for (j in 2: ncol(base_HOSPITAL_CENTRAL_FF.AA.)){
+    if (is.na(base_HOSPITAL_CENTRAL_FF.AA.[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_HOSPITAL_CENTRAL_FF.AA.)-1)){
+   base_HOSPITAL_CENTRAL_FF.AA.[i,-1] <- base_HOSPITAL_CENTRAL_FF.AA.[i-1,-1]
+  }
+}
+
+base_CASMU_SANATORIO_3 <- base[base$nombre == "CASMU - SANATORIO 3", ]
+base_CASMU_SANATORIO_3 <- base_CASMU_SANATORIO_3 %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CASMU_SANATORIO_3 <- fill(base_CASMU_SANATORIO_3, colnames(base_CASMU_SANATORIO_3))
+for(i in 1:nrow(base_CASMU_SANATORIO_3)){
+  suma_na<-0
+  for (j in 2: ncol(base_CASMU_SANATORIO_3)){
+    if (is.na(base_CASMU_SANATORIO_3[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CASMU_SANATORIO_3)-1)){
+   base_CASMU_SANATORIO_3[i,-1] <- base_CASMU_SANATORIO_3[i-1,-1]
+  }
+}
+
+base_MUCAM <- base[base$nombre == "MUCAM", ]
+base_MUCAM <- base_MUCAM %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_MUCAM <- fill(base_MUCAM, colnames(base_MUCAM))
+for(i in 1:nrow(base_MUCAM)){
+  suma_na<-0
+  for (j in 2: ncol(base_MUCAM)){
+    if (is.na(base_MUCAM[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_MUCAM)-1)){
+   base_MUCAM[i,-1] <- base_MUCAM[i-1,-1]
+  }
+}
+
+base_CASMU_IAMPP <- base[base$nombre == "CASMU-IAMPP", ]
+base_CASMU_IAMPP <- base_CASMU_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CASMU_IAMPP <- fill(base_CASMU_IAMPP, colnames(base_CASMU_IAMPP))
+for(i in 1:nrow(base_CASMU_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CASMU_IAMPP)){
+    if (is.na(base_CASMU_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CASMU_IAMPP)-1)){
+   base_CASMU_IAMPP[i,-1] <- base_CASMU_IAMPP[i-1,-1]
+  }
+}
+
+base_HOSPITAL_POLICIAL <- base[base$nombre == "HOSPITAL POLICIAL", ]
+base_HOSPITAL_POLICIAL <- base_HOSPITAL_POLICIAL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_HOSPITAL_POLICIAL <- fill(base_HOSPITAL_POLICIAL, colnames(base_HOSPITAL_POLICIAL))
+for(i in 1:nrow(base_HOSPITAL_POLICIAL)){
+  suma_na<-0
+  for (j in 2: ncol(base_HOSPITAL_POLICIAL)){
+    if (is.na(base_HOSPITAL_POLICIAL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_HOSPITAL_POLICIAL)-1)){
+   base_HOSPITAL_POLICIAL[i,-1] <- base_HOSPITAL_POLICIAL[i-1,-1]
+  }
+}
+
+base_ASSE_MACIEL <- base[base$nombre == "ASSE MACIEL", ]
+base_ASSE_MACIEL <- base_ASSE_MACIEL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_MACIEL <- fill(base_ASSE_MACIEL, colnames(base_ASSE_MACIEL))
+for(i in 1:nrow(base_ASSE_MACIEL)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_MACIEL)){
+    if (is.na(base_ASSE_MACIEL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_MACIEL)-1)){
+   base_ASSE_MACIEL[i,-1] <- base_ASSE_MACIEL[i-1,-1]
+  }
+}
+
+base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL <- base[base$nombre == "ASSE - CENTRO HOSPITALARIO PEREIRA ROSSELL", ]
+base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL <- base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL <- fill(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL, colnames(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL))
+for(i in 1:nrow(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL)){
+    if (is.na(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL)-1)){
+   base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL[i,-1] <- base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL[i-1,-1]
+  }
+}
+
+base_ASSE_INOT <- base[base$nombre == "ASSE INOT", ]
+base_ASSE_INOT <- base_ASSE_INOT %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_INOT <- fill(base_ASSE_INOT, colnames(base_ASSE_INOT))
+for(i in 1:nrow(base_ASSE_INOT)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_INOT)){
+    if (is.na(base_ASSE_INOT[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_INOT)-1)){
+   base_ASSE_INOT[i,-1] <- base_ASSE_INOT[i-1,-1]
+  }
+}
+
+base_COMEPA <- base[base$nombre == "COMEPA", ]
+base_COMEPA <- base_COMEPA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+for(i in 1:nrow(base_COMEPA)){
+  suma_na<-0
+  for (j in 2: ncol(base_COMEPA)){
+    if (is.na(base_COMEPA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMEPA)-1)){
+    base_COMEPA[i,-1] <- base_COMEPA[i-1,-1]
+  }
+}
+
+
+#base_COMEPA2 <- base[base$nombre == "COMEPA", ]
+#base_COMEPA2 <- base_COMEPA2 %>%
+#  mutate(last_edited_date = as_date(last_edited_date)) %>%
+#  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMEPA2 <- fill(base_COMEPA2, colnames(base_COMEPA2))
+
+base_ASSE_PAYSANDU <- base[base$nombre == "ASSE PAYSANDU", ]
+base_ASSE_PAYSANDU <- base_ASSE_PAYSANDU %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_PAYSANDU <- fill(base_ASSE_PAYSANDU, colnames(base_ASSE_PAYSANDU))
+for(i in 1:nrow(base_ASSE_PAYSANDU)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_PAYSANDU)){
+    if (is.na(base_ASSE_PAYSANDU[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_PAYSANDU)-1)){
+   base_ASSE_PAYSANDU[i,-1] <- base_ASSE_PAYSANDU[i-1,-1]
+  }
+}
+
+base_AMEDRIN <- base[base$nombre == "AMEDRIN", ]
+base_AMEDRIN <- base_AMEDRIN %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_AMEDRIN <- fill(base_AMEDRIN, colnames(base_AMEDRIN))
+for(i in 1:nrow(base_AMEDRIN)){
+  suma_na<-0
+  for (j in 2: ncol(base_AMEDRIN)){
+    if (is.na(base_AMEDRIN[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_AMEDRIN)-1)){
+   base_AMEDRIN[i,-1] <- base_AMEDRIN[i-1,-1]
+  }
+}
+
+base_CAMY_IAMPP <- base[base$nombre == "CAMY IAMPP", ]
+base_CAMY_IAMPP <- base_CAMY_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMY_IAMPP <- fill(base_CAMY_IAMPP, colnames(base_CAMY_IAMPP))
+for(i in 1:nrow(base_CAMY_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMY_IAMPP)){
+    if (is.na(base_CAMY_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMY_IAMPP)-1)){
+   base_CAMY_IAMPP[i,-1] <- base_CAMY_IAMPP[i-1,-1]
+  }
+}
+
+base_CASMER_IAMPP <- base[base$nombre == "CASMER IAMPP", ]
+base_CASMER_IAMPP <- base_CASMER_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CASMER_IAMPP <- fill(base_CASMER_IAMPP, colnames(base_CASMER_IAMPP))
+for(i in 1:nrow(base_CASMER_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CASMER_IAMPP)){
+    if (is.na(base_CASMER_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CASMER_IAMPP)-1)){
+   base_CASMER_IAMPP[i,-1] <- base_CASMER_IAMPP[i-1,-1]
+  }
+}
+
+base_COMERI <- base[base$nombre == "COMERI", ]
+base_COMERI <- base_COMERI %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+
+#base_COMERI <- fill(base_COMERI, colnames(base_COMERI))
+for(i in 1:nrow(base_COMERI)){
+  suma_na<-0
+  for (j in 2: ncol(base_COMERI)){
+    if (is.na(base_COMERI[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMERI)-1)){
+   base_COMERI[i,-1] <- base_COMERI[i-1,-1]
+  }
+}
+
+base_CASMER_IAMPP <- base[base$nombre == "CASMER IAMPP", ]
+base_CASMER_IAMPP <- base_CASMER_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CASMER_IAMPP <- fill(base_CASMER_IAMPP, colnames(base_CASMER_IAMPP))
+for(i in 1:nrow(base_CASMER_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CASMER_IAMPP)){
+    if (is.na(base_CASMER_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CASMER_IAMPP)-1)){
+   base_CASMER_IAMPP[i,-1] <- base_CASMER_IAMPP[i-1,-1]
+  }
+}
+
+base_ASSE_RIVERA <- base[base$nombre == "ASSE RIVERA", ]
+base_ASSE_RIVERA <- base_ASSE_RIVERA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_RIVERA <- fill(base_ASSE_RIVERA, colnames(base_ASSE_RIVERA))
+for(i in 1:nrow(base_ASSE_RIVERA)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_RIVERA)){
+    if (is.na(base_ASSE_RIVERA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_RIVERA)-1)){
+   base_ASSE_RIVERA[i,-1] <- base_ASSE_RIVERA[i-1,-1]
+  }
+}
+
+base_COMERO_IAMPP <- base[base$nombre == "COMERO IAMPP", ]
+base_COMERO_IAMPP <- base_COMERO_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMERO_IAMPP <- fill(base_COMERO_IAMPP, colnames(base_COMERO_IAMPP))
+for(i in 1:nrow(base_COMERO_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_COMERO_IAMPP)){
+    if (is.na(base_COMERO_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMERO_IAMPP)-1)){
+   base_COMERO_IAMPP[i,-1] <- base_COMERO_IAMPP[i-1,-1]
+  }
+}
+
+
+base_SANATORIO_PANAMERICANO <- base[base$nombre == "SANATORIO PANAMERICANO", ]
+base_SANATORIO_PANAMERICANO <- base_SANATORIO_PANAMERICANO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+base_SANATORIO_PANAMERICANO <- fill(base_SANATORIO_PANAMERICANO, colnames(base_SANATORIO_PANAMERICANO))
+#base_COMERO_IAMPP <- fill(base_COMERO_IAMPP, colnames(base_COMERO_IAMPP))
+for(i in 1:nrow(base_SANATORIO_PANAMERICANO)){
+  suma_na<-0
+  for (j in 2: ncol(base_SANATORIO_PANAMERICANO)){
+    if (is.na(base_SANATORIO_PANAMERICANO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_SANATORIO_PANAMERICANO)-1)){
+   base_SANATORIO_PANAMERICANO[i,-1] <- base_SANATORIO_PANAMERICANO[i-1,-1]
+  }
+}
+
+base_ASSE_SALTO <- base[base$nombre == "ASSE SALTO", ]
+base_ASSE_SALTO <- base_ASSE_SALTO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_SALTO <- fill(base_ASSE_SALTO, colnames(base_ASSE_SALTO))
+for(i in 1:nrow(base_ASSE_SALTO)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_SALTO)){
+    if (is.na(base_ASSE_SALTO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_SALTO)-1)){
+   base_ASSE_SALTO[i,-1] <- base_ASSE_SALTO[i-1,-1]
+  }
+}
+
+base_AMSJ_IAMPP <- base[base$nombre == "AMSJ IAMPP", ]
+base_AMSJ_IAMPP <- base_AMSJ_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_AMSJ_IAMPP <- fill(base_AMSJ_IAMPP, colnames(base_AMSJ_IAMPP))
+for(i in 1:nrow(base_AMSJ_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_AMSJ_IAMPP)){
+    if (is.na(base_AMSJ_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_AMSJ_IAMPP)-1)){
+   base_AMSJ_IAMPP[i,-1] <- base_AMSJ_IAMPP[i-1,-1]
+  }
+}
+
+base_CAMS_IAMPP <- base[base$nombre == "CAMS - IAMPP", ]
+base_CAMS_IAMPP <- base_CAMS_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMS_IAMPP <- fill(base_CAMS_IAMPP, colnames(base_CAMS_IAMPP))
+for(i in 1:nrow(base_CAMS_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMS_IAMPP)){
+    if (is.na(base_CAMS_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMS_IAMPP)-1)){
+   base_CAMS_IAMPP[i,-1] <- base_CAMS_IAMPP[i-1,-1]
+  }
+}
+
+
+base_COMTA <- base[base$nombre == "COMTA", ]
+base_COMTA <- base_COMTA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMTA <- fill(base_COMTA, colnames(base_COMTA))
+for(i in 1:nrow(base_COMTA)){
+  suma_na<-0
+  for (j in 2: ncol(base_COMTA)){
+    if (is.na(base_COMTA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMTA)-1)){
+   base_COMTA[i,-1] <- base_COMTA[i-1,-1]
+  }
+}
+
+base_ASSE_TACUAREMBO <- base[base$nombre == "ASSE TACUAREMBO", ]
+base_ASSE_TACUAREMBO <- base_ASSE_TACUAREMBO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_TACUAREMBO <- fill(base_ASSE_TACUAREMBO, colnames(base_ASSE_TACUAREMBO))
+for(i in 1:nrow(base_ASSE_TACUAREMBO)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_TACUAREMBO)){
+    if (is.na(base_ASSE_TACUAREMBO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_TACUAREMBO)-1)){
+   base_ASSE_TACUAREMBO[i,-1] <- base_ASSE_TACUAREMBO[i-1,-1]
+  }
+}
+
+base_IAC <- base[base$nombre == "IAC", ]
+base_IAC <- base_IAC %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_IAC <- fill(base_IAC, colnames(base_IAC))
+for(i in 1:nrow(base_IAC)){
+  suma_na<-0
+  for (j in 2: ncol(base_IAC)){
+    if (is.na(base_IAC[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_IAC)-1)){
+   base_IAC[i,-1] <- base_IAC[i-1,-1]
+  }
+}
+
+base_ASSE_TREINTAyTRES <- base[base$nombre == "ASSE TREINTA y TRES", ]
+base_ASSE_TREINTAyTRES <- base_ASSE_TREINTAyTRES %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_TREINTAyTRES <- fill(base_ASSE_TREINTAyTRES, colnames(base_ASSE_TREINTAyTRES))
+for(i in 1:nrow(base_ASSE_TREINTAyTRES)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_TREINTAyTRES)){
+    if (is.na(base_ASSE_TREINTAyTRES[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_TREINTAyTRES)-1)){
+   base_ASSE_TREINTAyTRES[i,-1] <- base_ASSE_TREINTAyTRES[i-1,-1]
+  }
+}
+
+
+```
+
+```{r data.frame.total, echo=FALSE}
+
+base <- rbind(base_GREMEDA_IAMPP, base_COMECA_IAMPP, base_CRAMI, base_CAAMEPA_IAMPP, base_ASSE_LAS_PIEDRAS, 
+              base_CAMCEL, base_CAMEC, base_CAMEC_IAMPP, base_CAMOC_IAMPP, base_CAMEDUR, base_COMEF, base_ASSE_FLORIDA,
+              base_CAMDEL_IAMPP, base_ASSE_LAVALLEJA, base_CRAME, base_AMDM_IAMPP, base_ASSE_MALDONADO, base_SANATORIO_AMERICANO,
+              base_ASOCIACION_ESPAÑOLA, base_CCOU, base_CUDAM, base_HOSPITAL_EVANGELICO, base_UNIVERSAL, base_ASSE_ESPAÑOL,
+              base_CASA_DE_GALICIA, base_ASSE_PASTEUR, base_SMI, base_HOSPITAL_BRITANICO, base_HOSPITAL_CENTRAL_FF.AA. , 
+              base_CASMU_SANATORIO_3, base_MUCAM, base_CASMU_IAMPP, base_HOSPITAL_POLICIAL, base_ASSE_MACIEL, 
+              base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL, base_UDELAR, base_ASSE_INOT, base_COMEPA, base_ASSE_PAYSANDU,
+              base_AMEDRIN, base_CAMY_IAMPP, base_CASMER_IAMPP, base_COMERI, base_ASSE_RIVERA, base_COMERO_IAMPP,
+              base_SANATORIO_PANAMERICANO, base_ASSE_SALTO, base_AMSJ_IAMPP, base_CAMS_IAMPP, base_COMTA, base_ASSE_TACUAREMBO,
+              base_IAC, base_ASSE_TREINTAyTRES, base_ASSE_COLONIA)
+
+base <- base[order(base$last_edited_date), ]
+
+```
+
+```{r , echo=FALSE, warning=FALSE}
+
+base$cam_tot_disp_inst <- as.numeric(as.character(base$cam_tot_disp_inst))
+base$cam_cti_libres <- as.numeric(as.character(base$cam_cti_libres))
+base$cam_cti_hab <- as.numeric(as.character(base$cam_cti_hab))
+base$cam_cti_bloq <- as.numeric(as.character(base$cam_cti_bloq))
+base$cam_cti_ocu_tot <- as.numeric(as.character(base$cam_cti_ocu_tot))
+base$cam_cti_ocu_covid19 <- as.numeric(as.character(base$cam_cti_ocu_covid19))
+base$cam_cti_ocu_rag <- as.numeric(as.character(base$cam_cti_ocu_rag))
+base$cam_cti_ocu_otro <- as.numeric(as.character(base$cam_cti_ocu_otro))
+base$cam_cti_amp <- as.numeric(as.character(base$cam_cti_amp))
+
+base$cam_ci_libres <- as.numeric(as.character(base$cam_ci_libres))
+base$cam_ci_hab <- as.numeric(as.character(base$cam_ci_hab))
+base$cam_ci_bloq <- as.numeric(as.character(base$cam_ci_bloq))
+base$cam_ci_ocu_tot <- as.numeric(as.character(base$cam_ci_ocu_tot))
+base$cam_ci_ocu_covid19 <- as.numeric(as.character(base$cam_ci_ocu_covid19))
+base$cam_ci_ocu_rag <- as.numeric(as.character(base$cam_ci_ocu_rag))
+base$cam_ci_ocu_otro <- as.numeric(as.character(base$cam_ci_ocu_otro))
+base$cam_ci_amp <- as.numeric(as.character(base$cam_ci_amp))
+
+base$cam_ic_hab <- as.numeric(as.character(base$cam_ic_hab))
+base$cam_ic_bloq <- as.numeric(as.character(base$cam_ic_bloq))
+
+base$cam_ic_hab[is.na(base$cam_ic_hab)] <- 0
+base$cam_ic_bloq[is.na(base$cam_ic_bloq)] <- 0 
+
+
+base$dotación2 <- base$cam_ci_bloq + base$cam_cti_bloq + base$cam_ic_bloq + base$cam_ci_hab + base$cam_cti_hab + base$cam_ic_hab
+base$dotación <- base$cam_ci_bloq + base$cam_cti_bloq + base$cam_ci_hab + base$cam_cti_hab
+
+#write.csv2(base, file="base.csv", row.names = F)
+
+```
+
+      
+```{r, echo=FALSE, warning=FALSE}
+
+base$cam_tot_disp_inst <- as.numeric(as.character(base$cam_tot_disp_inst))
+base$cam_cti_libres <- as.numeric(as.character(base$cam_cti_libres))
+base$cam_cti_hab <- as.numeric(as.character(base$cam_cti_hab))
+base$cam_cti_bloq <- as.numeric(as.character(base$cam_cti_bloq))
+base$cam_cti_ocu_tot <- as.numeric(as.character(base$cam_cti_ocu_tot))
+base$cam_cti_ocu_covid19 <- as.numeric(as.character(base$cam_cti_ocu_covid19))
+base$cam_cti_ocu_rag <- as.numeric(as.character(base$cam_cti_ocu_rag))
+base$cam_cti_ocu_otro <- as.numeric(as.character(base$cam_cti_ocu_otro))
+base$cam_cti_amp <- as.numeric(as.character(base$cam_cti_amp))
+
+base$cam_ci_libres <- as.numeric(as.character(base$cam_ci_libres))
+base$cam_ci_hab <- as.numeric(as.character(base$cam_ci_hab))
+base$cam_ci_bloq <- as.numeric(as.character(base$cam_ci_bloq))
+base$cam_ci_ocu_tot <- as.numeric(as.character(base$cam_ci_ocu_tot))
+base$cam_ci_ocu_covid19 <- as.numeric(as.character(base$cam_ci_ocu_covid19))
+base$cam_ci_ocu_rag <- as.numeric(as.character(base$cam_ci_ocu_rag))
+base$cam_ci_ocu_otro <- as.numeric(as.character(base$cam_ci_ocu_otro))
+base$cam_ci_amp <- as.numeric(as.character(base$cam_ci_amp))
+
+```
+
+
+```{r variables, echo=FALSE}
+base$cam_cti_ocu_tot[is.na(base$cam_cti_ocu_tot)] <- 0
+base$cam_ci_ocu_tot[is.na(base$cam_ci_ocu_tot)] <- 0
+base$cam_cti_ocu_covid19[is.na(base$cam_cti_ocu_covid19)] <- 0
+base$cam_ci_ocu_covid19[is.na(base$cam_ci_ocu_covid19)] <- 0
+base$cam_cti_ocu_otro[is.na(base$cam_cti_ocu_otro)] <- 0
+base$cam_ci_ocu_otro[is.na(base$cam_ci_ocu_otro)] <- 0
+base$cam_cti_ocu_rag[is.na(base$cam_cti_ocu_rag)] <- 0
+base$cam_ci_ocu_rag[is.na(base$cam_ci_ocu_rag)] <- 0
+base$cam_cti_hab[is.na(base$cam_cti_hab)] <- 0
+base$cam_ci_hab[is.na(base$cam_ci_hab)] <- 0
+base$cam_cti_libres[is.na(base$cam_cti_libres)] <- 0
+base$cam_ci_libres[is.na(base$cam_ci_libres)] <- 0
+base$cam_cti_bloq[is.na(base$cam_cti_bloq)] <- 0
+base$cam_ci_bloq[is.na(base$cam_ci_bloq)] <- 0
+
+base$Cama.ocup <- (base$cam_cti_ocu_tot + base$cam_ci_ocu_tot)
+base$Ocup_COVID <- (base$cam_cti_ocu_covid19 + base$cam_ci_ocu_covid19)
+base$Ocup_otros <- (base$cam_cti_ocu_otro + base$cam_ci_ocu_otro)
+base$Ocup_IRAG <- (base$cam_cti_ocu_rag + base$cam_ci_ocu_rag)
+base$Dotación <- (base$cam_cti_hab + base$cam_ci_hab)
+base$Libres <- (base$cam_cti_libres + base$cam_ci_libres)
+base$Bloqueadas <-(base$cam_cti_bloq + base$cam_ci_bloq)
+
+
+base$Ocup_NO_COVID <- (base$cam_cti_ocu_rag + base$cam_ci_ocu_rag + base$cam_cti_ocu_otro + base$cam_ci_ocu_otro)
+
+base$Disponibles <- base$Cama.ocup + base$Libres
+
+```
+      
+      
+        
+```{r echo=FALSE}
+
+OPS <- cbind(base[ ,c(1, 4)], base[ ,3], base[ ,c(2, 52)], base[ ,c(44:47)])
+  
+OPS <- rename(OPS, Fecha = last_edited_date, 
+                   Departamento = departamen, 
+                   Sector = servicios, 
+                   Institución = nombre, 
+                   "Camas_disponibles_ADULTOS" = Disponibles, 
+                   "Camas_ocupadas_ADULTOS" = Cama.ocup, 
+                   "Ocup.COVID_ADULTOS" = Ocup_COVID, 
+                   "Ocup.IRAG_ADULTOS" = Ocup_IRAG,
+                   "Ocup.Otro_ADULTOS" = Ocup_otros)
+
+OPS$"% Ocup.General_ADULTOS" <- ifelse(OPS$"Camas_disponibles_ADULTOS" == 0, "0",
+                                       round(OPS$"Camas_ocupadas_ADULTOS"/OPS$"Camas_disponibles_ADULTOS"*100,1))
+OPS$"% Ocup.por.COVID_ADULTOS" <- ifelse(OPS$"Camas_disponibles_ADULTOS" == 0, "0",
+                                         round(OPS$"Ocup.COVID_ADULTOS"/OPS$"Camas_disponibles_ADULTOS"*100,1))
+OPS$"% Ocup.por.Otro_ADULTOS" <- ifelse(OPS$"Ocup.Otro_ADULTOS" == 0, "0",
+                                         round(OPS$"Ocup.Otro_ADULTOS"/OPS$"Camas_disponibles_ADULTOS"*100,1))
+OPS$"% Ocup.por.IRAG_ADULTOS" <- ifelse(OPS$"Ocup.IRAG_ADULTOS" == 0, "0",
+                                       round(OPS$"Ocup.IRAG_ADULTOS"/OPS$"Camas_disponibles_ADULTOS"*100,1))
+
+
+```
+        
+```{r echo=FALSE}
+
+write.csv2(OPS, file = "base_OPS22082021.csv", row.names = F)  
+```
+        
+
+
+

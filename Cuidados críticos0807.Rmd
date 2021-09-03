@@ -1,0 +1,2043 @@
+---
+title: "Ocupación de camas"
+author: "Área de Información - Sinae"
+date: "`r format(Sys.time(), '%d %B de %Y')`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+subtitle: Centros de cuidados críticos en Uruguay
+theme: zenburn
+header-includes:
+  - \usepackage{graphicx}
+  - \usepackage{lastpage}
+  - \usepackage[pscoord]{eso-pic}
+  - \usepackage{transparent}
+  - \geometry{paper=a4paper,left=30mm, right=30mm, top=40mm, bottom=40mm, headheight=3.2cm, footskip=3cm}
+  - \usepackage{fancyhdr}
+  - \fancyhfoffset[L]{3cm}
+  - \fancyhfoffset[R]{3cm}
+  - \fancypagestyle{plain}{
+  - \renewcommand{\headrulewidth}{0pt}
+  - \renewcommand{\footrulewidth}{0pt}
+  - \chead{\includegraphics[width=2551px]{Mira Logo.png}}
+  - \cfoot{\includegraphics[width=2551px]{pie de página.png}}
+  - \cfoot{\raisebox{3cm}[0pt][0pt]{\makebox[0pt]{\parbox{0.8\textwidth}{\centering\textbf{Página \thepage\, de\, \pageref*{LastPage}}}}}}}
+  - \pagestyle{fancy}
+  - \renewcommand{\headrulewidth}{0pt}
+  - \renewcommand{\footrulewidth}{0pt}
+  - \lhead{\includegraphics[width=2551px]{Mira Logo.png}}
+  - \lfoot{\includegraphics[width=2551px]{pie de página.png}}
+  - \cfoot{\raisebox{3cm}[0pt][0pt]{\makebox[0pt]{\parbox{0.8\textwidth}{\centering\textbf{Página \thepage\, de\, \pageref*{LastPage}}}}}}
+  - \newcommand\BackgroundPic{\put(0,0){\parbox[b][\paperheight]{\paperwidth}{\vfill\centering\transparent{0.5}\includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio]{fondo.png}\vfill}}}
+  - \AddToShipoutPicture{\BackgroundPic}
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(datos)
+library(lubridate)
+library(ggplot2)
+library(data.table)
+library(kableExtra)
+library(tinytex)
+library(graphics)
+
+setwd("C:\\Users\\User\\Documents\\02_SINAE\\CTI\\Bases")
+
+dato <- read.csv("Base\\centrosdeasistenciaii_history_20210709.csv", sep = ";", encoding = "UTF-8")
+
+#devisa <- read.csv("Base\\datos_devisa_covid_20210601.csv", sep = ";", encoding = "UTF-8")
+#devisa <- devisa[devisa$casosestado == "C", ]
+
+base_total <- subset(dato, (nombre != "CTI_test" & 
+                      nombre != "UDELAR CENAQUE" &    
+                      nombre != "SANATORIO URUGUAY" &
+                      nombre != "GREMCA"))
+
+base <- select(base_total, c(nombre, last_edited_date,	servicios, departamen, localidad,
+                             direccion,	tipo,	categoria,	prestador,	calle,	numero, cam_tot_disp_inst, 
+                               cam_cti_libres, cam_cti_hab, cam_cti_bloq, cam_cti_ocu_tot, cam_cti_ocu_rag,
+                               cam_cti_ocu_covid19, cam_cti_ocu_otro, cam_cti_amp,
+                              cam_ci_libres, cam_ci_hab, cam_ci_bloq, cam_ci_ocu_tot, cam_ci_ocu_rag, 
+                              cam_ci_ocu_covid19, cam_ci_ocu_otro, cam_ci_amp, 
+                             cam_ic_libres, cam_ic_hab, cam_ic_bloq, cam_ic_ocu_tot, cam_ic_ocu_rag,
+                             cam_ic_ocu_covid19, cam_ic_ocu_otro, cam_cti_libres_ais_resp, cam_ci_libres_ais_resp,
+                             vent_cant_oaf, vent_cant_vni, vent_cant_total))
+
+base$last_edited_date <- as.POSIXct(as.character(base$last_edited_date, format="%m/%d/%Y %H:%M:%S"))
+tz(base$last_edited_date)<-"GMT"
+attributes(base$last_edited_date)$tzone <- "America/Montevideo" 
+
+#base$last_edited_date <- base$last_edited_date - (60*60*3) #3 horas por diferencia de servidor
+base <- subset(base, last_edited_date >= "2020-12-09 00:00:00")
+base$Fecha <- lubridate::as_date(base$last_edited_date)
+
+```
+
+
+```{r, echo=FALSE}
+
+base$nombre[base$nombre == "ASSE Treinta y Tres"] <- "ASSE TREINTA y TRES"
+base$nombre[base$nombre == "HOSPTIAL POLICIAL"] <- "HOSPITAL POLICIAL"
+base$nombre[base$nombre == "Comero IAMPP"] <- "COMERO IAMPP"
+base$nombre[base$nombre == "ASOCIACION ESPA<U+00D1>OLA"] <- "ASOCIACION ESPAÑOLA"
+base$nombre[base$nombre == "ASSE ESPA<U+00D1>OL"] <- "ASSE ESPAÑOL"
+
+```
+
+```{r Departamento_servicio_localidad interior, echo=FALSE}
+base$departamen[base$nombre == "GREMEDA IAMPP"] <- "Artigas"
+base$servicios[base$nombre == "GREMEDA IAMPP"] <- "Privado"
+base$localidad[base$nombre == "GREMEDA IAMPP"] <- "Artigas"
+
+base$departamen[base$nombre == "ASSE LAS PIEDRAS"] <- "Canelones"
+base$servicios[base$nombre == "ASSE LAS PIEDRAS"] <- "Público"
+base$localidad[base$nombre == "ASSE LAS PIEDRAS"] <- "Las Piedras"
+
+base$departamen[base$nombre == "CRAMI"] <- "Canelones"
+base$servicios[base$nombre == "CRAMI"] <- "Privado"
+base$localidad[base$nombre == "CRAMI"] <- "Las Piedras"
+
+base$departamen[base$nombre == "CAAMEPA IAMPP"] <- "Canelones"
+base$servicios[base$nombre == "CAAMEPA IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAAMEPA IAMPP"] <- "Pando"
+
+base$departamen[base$nombre == "COMECA IAMPP"] <- "Canelones"
+base$servicios[base$nombre == "COMECA IAMPP"] <- "Privado"
+base$localidad[base$nombre == "COMECA IAMPP"] <- "Canelones"
+
+base$departamen[base$nombre == "CAMCEL"] <- "Cerro Largo"
+base$servicios[base$nombre == "CAMCEL"] <- "Privado"
+base$localidad[base$nombre == "CAMCEL"] <- "Melo"
+
+base$departamen[base$nombre == "CAMEC"] <- "Colonia"
+base$servicios[base$nombre == "CAMEC"] <- "Privado"
+base$localidad[base$nombre == "CAMEC"] <- "Colonia"
+
+base$departamen[base$nombre == "ASSE COLONIA"] <- "Colonia"
+base$servicios[base$nombre == "ASSE COLONIA"] <- "Público"
+base$localidad[base$nombre == "ASSE COLONIA"] <- "Colonia"
+
+base$departamen[base$nombre == "CAMEC-IAMPP"] <- "Colonia"
+base$servicios[base$nombre == "CAMEC-IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAMEC-IAMPP"] <- "Rosario"
+
+base$departamen[base$nombre == "CAMOC IAMPP"] <- "Colonia"
+base$servicios[base$nombre == "CAMOC IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAMOC IAMPP"] <- "Carmelo"
+
+base$departamen[base$nombre == "CAMEDUR"] <- "Durazno"
+base$servicios[base$nombre == "CAMEDUR"] <- "Privado"
+base$localidad[base$nombre == "CAMEDUR"] <- "Durazno"
+
+base$departamen[base$nombre == "ASSE FLORIDA"] <- "Florida"
+base$servicios[base$nombre == "ASSE FLORIDA"] <- "Público"
+base$localidad[base$nombre == "ASSE FLORIDA"] <- "Florida"
+
+base$departamen[base$nombre == "COMEF"] <- "Florida"
+base$servicios[base$nombre == "COMEF"] <- "Privado"
+base$localidad[base$nombre == "COMEF"] <- "Florida"
+
+base$departamen[base$nombre == "ASSE LAVALLEJA"] <- "Lavalleja"
+base$servicios[base$nombre == "ASSE LAVALLEJA"] <- "Público"
+base$localidad[base$nombre == "ASSE LAVALLEJA"] <- "Minas"
+
+base$departamen[base$nombre == "CAMDEL IAMPP"] <- "Lavalleja"
+base$servicios[base$nombre == "CAMDEL IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAMDEL IAMPP"] <- "Minas"
+
+base$departamen[base$nombre == "AMDM IAMPP"] <- "Maldonado"
+base$servicios[base$nombre == "AMDM IAMPP"] <- "Privado"
+base$localidad[base$nombre == "AMDM IAMPP"] <- "Punta del Este"
+
+base$departamen[base$nombre == "ASSE MALDONADO"] <- "Maldonado"
+base$servicios[base$nombre == "ASSE MALDONADO"] <- "Público"
+base$localidad[base$nombre == "ASSE MALDONADO"] <- "Maldonado"
+
+base$departamen[base$nombre == "CRAME"] <- "Maldonado"
+base$servicios[base$nombre == "CRAME"] <- "Privado"
+base$localidad[base$nombre == "CRAME"] <- "Maldonado"
+
+base$departamen[base$nombre == "ASSE PAYSANDU"] <- "Paysandú"
+base$servicios[base$nombre == "ASSE PAYSANDU"] <- "Público"
+base$localidad[base$nombre == "ASSE PAYSANDU"] <- "Paysandú"
+
+base$departamen[base$nombre == "COMEPA"] <- "Paysandú"
+base$servicios[base$nombre == "COMEPA"] <- "Privado"
+base$localidad[base$nombre == "COMEPA"] <- "Paysandú"
+
+base$departamen[base$nombre == "CAMY IAMPP"] <- "Río Negro"
+base$servicios[base$nombre == "CAMY IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAMY IAMPP"] <- "Young"
+
+base$departamen[base$nombre == "AMEDRIN"] <- "Río Negro"
+base$servicios[base$nombre == "AMEDRIN"] <- "Privado"
+base$localidad[base$nombre == "AMEDRIN"] <- "Fray Bentos"
+
+base$departamen[base$nombre == "ASSE RIVERA"] <- "Rivera"
+base$servicios[base$nombre == "ASSE RIVERA"] <- "Público"
+base$localidad[base$nombre == "ASSE RIVERA"] <- "Rivera"
+
+base$departamen[base$nombre == "CASMER IAMPP"] <- "Rivera"
+base$servicios[base$nombre == "CASMER IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CASMER IAMPP"] <- "Rivera"
+
+base$departamen[base$nombre == "COMERI"] <- "Rivera"
+base$servicios[base$nombre == "COMERI"] <- "Privado"
+base$localidad[base$nombre == "COMERI"] <- "Rivera"
+
+base$departamen[base$nombre == "COMERO IAMPP"] <- "Rocha"
+base$servicios[base$nombre == "COMERO IAMPP"] <- "Privado"
+base$localidad[base$nombre == "COMERO IAMPP"] <- "Rocha"
+
+base$departamen[base$nombre == "ASSE SALTO"] <- "Salto"
+base$servicios[base$nombre == "ASSE SALTO"] <- "Público"
+base$localidad[base$nombre == "ASSE SALTO"] <- "Salto"
+
+base$departamen[base$nombre == "SANATORIO PANAMERICANO"] <- "Salto"
+base$servicios[base$nombre == "SANATORIO PANAMERICANO"] <- "Privado"
+base$localidad[base$nombre == "SANATORIO PANAMERICANO"] <- "Salto"
+
+base$departamen[base$nombre == "AMSJ IAMPP"] <- "San José"
+base$servicios[base$nombre == "AMSJ IAMPP"] <- "Privado"
+base$localidad[base$nombre == "AMSJ IAMPP"] <- "San José de Mayo"
+
+base$departamen[base$nombre == "CAMS - IAMPP"] <- "Soriano"
+base$servicios[base$nombre == "CAMS - IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CAMS - IAMPP"] <- "Mercedes"
+
+base$departamen[base$nombre == "ASSE TACUAREMBO"] <- "Tacuarembó"
+base$servicios[base$nombre == "ASSE TACUAREMBO"] <- "Público"
+base$localidad[base$nombre == "ASSE TACUAREMBO"] <- "Tacuarembó"
+
+base$departamen[base$nombre == "COMTA"] <- "Tacuarembó"
+base$servicios[base$nombre == "COMTA"] <- "Privado"
+base$localidad[base$nombre == "COMTA"] <- "Tacuarembó"
+
+base$departamen[base$nombre == "ASSE TREINTA y TRES"] <- "Treinta y Tres"
+base$servicios[base$nombre == "ASSE TREINTA y TRES"] <- "Público"
+base$localidad[base$nombre == "ASSE TREINTA y TRES"] <- "Treinta y Tres"
+
+base$departamen[base$nombre == "IAC"] <- "Treinta y Tres"
+base$servicios[base$nombre == "IAC"] <- "Privado"
+base$localidad[base$nombre == "IAC"] <- "Treinta y Tres"
+
+```
+
+```{r Departamento_servicio_localidad montevideo, echo=FALSE}
+
+base$departamen[base$nombre == "ASOCIACION ESPAÑOLA"] <- "Montevideo"
+base$servicios[base$nombre == "ASOCIACION ESPAÑOLA"] <- "Privado"
+base$localidad[base$nombre == "ASOCIACION ESPAÑOLA"] <- "Montevideo"
+
+base$departamen[base$nombre == "ASSE - CENTRO HOSPITALARIO PEREIRA ROSSELL"] <- "Montevideo"
+base$servicios[base$nombre == "ASSE - CENTRO HOSPITALARIO PEREIRA ROSSELL"] <- "Público"
+base$localidad[base$nombre == "ASSE - CENTRO HOSPITALARIO PEREIRA ROSSELL"] <- "Montevideo"
+
+base$departamen[base$nombre == "ASSE ESPAÑOL"] <- "Montevideo"
+base$servicios[base$nombre == "ASSE ESPAÑOL"] <- "Público"
+base$localidad[base$nombre == "ASSE ESPAÑOL"] <- "Montevideo"
+
+base$departamen[base$nombre == "ASSE INOT"] <- "Montevideo"
+base$servicios[base$nombre == "ASSE INOT"] <- "Público"
+base$localidad[base$nombre == "ASSE INOT"] <- "Montevideo"
+
+base$departamen[base$nombre == "ASSE MACIEL"] <- "Montevideo"
+base$servicios[base$nombre == "ASSE MACIEL"] <- "Público"
+base$localidad[base$nombre == "ASSE MACIEL"] <- "Montevideo"
+
+base$departamen[base$nombre == "ASSE PASTEUR"] <- "Montevideo"
+base$servicios[base$nombre == "ASSE PASTEUR"] <- "Público"
+base$localidad[base$nombre == "ASSE PASTEUR"] <- "Montevideo"
+
+base$departamen[base$nombre == "CASA DE GALICIA"] <- "Montevideo"
+base$servicios[base$nombre == "CASA DE GALICIA"] <- "Privado"
+base$localidad[base$nombre == "CASA DE GALICIA"] <- "Montevideo"
+
+base$departamen[base$nombre == "CASMU - SANATORIO 3"] <- "Montevideo"
+base$servicios[base$nombre == "CASMU - SANATORIO 3"] <- "Privado"
+base$localidad[base$nombre == "CASMU - SANATORIO 3"] <- "Montevideo"
+
+base$departamen[base$nombre == "CASMU-IAMPP"] <- "Montevideo"
+base$servicios[base$nombre == "CASMU-IAMPP"] <- "Privado"
+base$localidad[base$nombre == "CASMU-IAMPP"] <- "Montevideo"
+
+base$departamen[base$nombre == "CCOU"] <- "Montevideo"
+base$servicios[base$nombre == "CCOU"] <- "Privado"
+base$localidad[base$nombre == "CCOU"] <- "Montevideo"
+
+base$departamen[base$nombre == "CUDAM"] <- "Montevideo"
+base$servicios[base$nombre == "CUDAM"] <- "Privado"
+base$localidad[base$nombre == "CUDAM"] <- "Montevideo"
+
+base$departamen[base$nombre == "HOSPITAL BRITANICO"] <- "Montevideo"
+base$servicios[base$nombre == "HOSPITAL BRITANICO"] <- "Privado"
+base$localidad[base$nombre == "HOSPITAL BRITANICO"] <- "Montevideo"
+
+base$departamen[base$nombre == "HOSPITAL CENTRAL FF.AA."] <- "Montevideo"
+base$servicios[base$nombre == "HOSPITAL CENTRAL FF.AA."] <- "Público"
+base$localidad[base$nombre == "HOSPITAL CENTRAL FF.AA."] <- "Montevideo"
+
+base$departamen[base$nombre == "HOSPITAL EVANGELICO"] <- "Montevideo"
+base$servicios[base$nombre == "HOSPITAL EVANGELICO"] <- "Privado"
+base$localidad[base$nombre == "HOSPITAL EVANGELICO"] <- "Montevideo"
+
+base$departamen[base$nombre == "HOSPITAL POLICIAL"] <- "Montevideo"
+base$servicios[base$nombre == "HOSPITAL POLICIAL"] <- "Público"
+base$localidad[base$nombre == "HOSPITAL POLICIAL"] <- "Montevideo"
+
+base$departamen[base$nombre == "MUCAM"] <- "Montevideo"
+base$servicios[base$nombre == "MUCAM"] <- "Privado"
+base$localidad[base$nombre == "MUCAM"] <- "Montevideo"
+
+base$departamen[base$nombre == "SANATORIO AMERICANO"] <- "Montevideo"
+base$servicios[base$nombre == "SANATORIO AMERICANO"] <- "Privado"
+base$localidad[base$nombre == "SANATORIO AMERICANO"] <- "Montevideo"
+
+base$departamen[base$nombre == "SMI"] <- "Montevideo"
+base$servicios[base$nombre == "SMI"] <- "Privado"
+base$localidad[base$nombre == "SMI"] <- "Montevideo"
+
+base$departamen[base$nombre == "UDELAR"] <- "Montevideo"
+base$servicios[base$nombre == "UDELAR"] <- "Público"
+base$localidad[base$nombre == "UDELAR"] <- "Montevideo"
+
+base$departamen[base$nombre == "UNIVERSAL"] <- "Montevideo"
+base$servicios[base$nombre == "UNIVERSAL"] <- "Privado"
+base$localidad[base$nombre == "UNIVERSAL"] <- "Montevideo"
+
+```
+
+```{r ordenar, echo=FALSE}
+
+base <- base[order(base$last_edited_date), ]
+
+write.csv2(base, file="base_total.csv", row.names = F)
+
+```
+
+
+```{r rellenar, echo=FALSE}
+
+base_GREMEDA_IAMPP <- base[base$nombre == "GREMEDA IAMPP", ]
+base_GREMEDA_IAMPP <- base_GREMEDA_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_GREMEDA_IAMPP <- fill(base_GREMEDA_IAMPP, colnames(base_GREMEDA_IAMPP))
+for(i in 1:nrow(base_GREMEDA_IAMPP )){
+  suma_na<-0
+  for (j in 2: ncol(base_GREMEDA_IAMPP )){
+    if (is.na(base_GREMEDA_IAMPP [i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_GREMEDA_IAMPP )-1)){
+    base_GREMEDA_IAMPP[i,-1] <- base_GREMEDA_IAMPP[i-1,-1]
+  }
+}
+
+base_COMECA_IAMPP <- base[base$nombre == "COMECA IAMPP", ]
+base_COMECA_IAMPP <- base_COMECA_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMECA_IAMPP <- fill(base_COMECA_IAMPP, colnames(base_COMECA_IAMPP))
+for(i in 1:nrow(base_COMECA_IAMPP )){
+  suma_na<-0
+  for (j in 2: ncol(base_COMECA_IAMPP )){
+    if (is.na(base_COMECA_IAMPP [i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMECA_IAMPP)-1)){
+    base_COMECA_IAMPP[i,-1] <- base_COMECA_IAMPP[i-1,-1]
+  }
+}
+
+base_CRAMI <- base[base$nombre == "CRAMI", ]
+base_CRAMI <- base_CRAMI %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CRAMI <- fill(base_CRAMI, colnames(base_CRAMI))
+for(i in 1:nrow(base_CRAMI)){
+  suma_na<-0
+  for (j in 2: ncol(base_CRAMI)){
+    if (is.na(base_CRAMI[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CRAMI)-1)){
+    base_CRAMI[i,-1] <- base_CRAMI[i-1,-1]
+  }
+}
+
+base_CAAMEPA_IAMPP <- base[base$nombre == "CAAMEPA IAMPP", ]
+base_CAAMEPA_IAMPP <- base_CAAMEPA_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAAMEPA_IAMPP <- fill(base_CAAMEPA_IAMPP, colnames(base_CAAMEPA_IAMPP))
+for(i in 1:nrow(base_CAAMEPA_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAAMEPA_IAMPP)){
+    if (is.na(base_CAAMEPA_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAAMEPA_IAMPP)-1)){
+    base_CAAMEPA_IAMPP[i,-1] <- base_CAAMEPA_IAMPP[i-1,-1]
+  }
+}
+
+base_ASSE_LAS_PIEDRAS <- base[base$nombre == "ASSE LAS PIEDRAS", ]
+base_ASSE_LAS_PIEDRAS <- base_ASSE_LAS_PIEDRAS %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_LAS_PIEDRAS <- fill(base_ASSE_LAS_PIEDRAS, colnames(base_ASSE_LAS_PIEDRAS))
+for(i in 1:nrow(base_ASSE_LAS_PIEDRAS)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_LAS_PIEDRAS)){
+    if (is.na(base_ASSE_LAS_PIEDRAS[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_LAS_PIEDRAS)-1)){
+    base_ASSE_LAS_PIEDRAS[i,-1] <- base_ASSE_LAS_PIEDRAS[i-1,-1]
+  }
+}
+
+base_CAMCEL <- base[base$nombre == "CAMCEL", ]
+base_CAMCEL <- base_CAMCEL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMCEL <- fill(base_CAMCEL, colnames(base_CAMCEL))
+for(i in 1:nrow(base_CAMCEL)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMCEL)){
+    if (is.na(base_CAMCEL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMCEL)-1)){
+    base_CAMCEL[i,-1] <- base_CAMCEL[i-1,-1]
+  }
+}
+
+base_CAMEC <- base[base$nombre == "CAMEC", ]
+base_CAMEC <- base_CAMEC %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMEC <- fill(base_CAMEC, colnames(base_CAMEC))
+for(i in 1:nrow(base_CAMEC)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMEC)){
+    if (is.na(base_CAMEC[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMEC)-1)){
+    base_CAMEC[i,-1] <- base_CAMEC[i-1,-1]
+  }
+}
+
+base_ASSE_COLONIA <- base[base$nombre == "ASSE COLONIA", ]
+base_ASSE_COLONIA <- base_ASSE_COLONIA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_COLONIA <- fill(base_ASSE_COLONIA, colnames(base_ASSE_COLONIA))
+for(i in 1:nrow(base_ASSE_COLONIA)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_COLONIA)){
+    if (is.na(base_ASSE_COLONIA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_COLONIA)-1)){
+    base_ASSE_COLONIA[i,-1] <- base_ASSE_COLONIA[i-1,-1]
+  }
+}
+
+base_CAMEC_IAMPP <- base[base$nombre == "CAMEC-IAMPP", ]
+base_CAMEC_IAMPP <- base_CAMEC_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMEC_IAMPP <- fill(base_CAMEC_IAMPP, colnames(base_CAMEC_IAMPP))
+for(i in 1:nrow(base_CAMEC_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMEC_IAMPP)){
+    if (is.na(base_CAMEC_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMEC_IAMPP)-1)){
+    base_CAMEC_IAMPP[i,-1] <- base_CAMEC_IAMPP[i-1,-1]
+  }
+}
+
+base_CAMOC_IAMPP <- base[base$nombre == "CAMOC IAMPP", ]
+base_CAMOC_IAMPP <- base_CAMOC_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMOC_IAMPP <- fill(base_CAMOC_IAMPP, colnames(base_CAMOC_IAMPP))
+for(i in 1:nrow(base_CAMOC_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMOC_IAMPP)){
+    if (is.na(base_CAMOC_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMOC_IAMPP)-1)){
+    base_CAMOC_IAMPP[i,-1] <- base_CAMOC_IAMPP[i-1,-1]
+  }
+}
+
+base_CAMEDUR <- base[base$nombre == "CAMEDUR", ]
+base_CAMEDUR <- base_CAMEDUR %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMEDUR <- fill(base_CAMEDUR, colnames(base_CAMEDUR))
+for(i in 1:nrow(base_CAMEDUR)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMEDUR)){
+    if (is.na(base_CAMEDUR[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMEDUR)-1)){
+    base_CAMEDUR[i,-1] <- base_CAMEDUR[i-1,-1]
+  }
+}
+
+base_COMEF <- base[base$nombre == "COMEF", ]
+base_COMEF <- base_COMEF %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMEF <- fill(base_COMEF, colnames(base_COMEF))
+for(i in 1:nrow(base_COMEF)){
+  suma_na<-0
+  for (j in 2: ncol(base_COMEF)){
+    if (is.na(base_COMEF[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMEF)-1)){
+    base_COMEF[i,-1] <- base_COMEF[i-1,-1]
+  }
+}
+
+base_ASSE_FLORIDA <- base[base$nombre == "ASSE FLORIDA", ]
+base_ASSE_FLORIDA <- base_ASSE_FLORIDA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_FLORIDA <- fill(base_ASSE_FLORIDA, colnames(base_ASSE_FLORIDA))
+for(i in 1:nrow(base_ASSE_FLORIDA)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_FLORIDA)){
+    if (is.na(base_ASSE_FLORIDA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_FLORIDA)-1)){
+    base_ASSE_FLORIDA[i,-1] <- base_ASSE_FLORIDA[i-1,-1]
+  }
+}
+
+base_CAMDEL_IAMPP <- base[base$nombre == "CAMDEL IAMPP", ]
+base_CAMDEL_IAMPP <- base_CAMDEL_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMDEL_IAMPP <- fill(base_CAMDEL_IAMPP, colnames(base_CAMDEL_IAMPP))
+for(i in 1:nrow(base_CAMDEL_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMDEL_IAMPP)){
+    if (is.na(base_CAMDEL_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMDEL_IAMPP)-1)){
+    base_CAMDEL_IAMPP[i,-1] <- base_CAMDEL_IAMPP[i-1,-1]
+  }
+}
+
+base_ASSE_LAVALLEJA <- base[base$nombre == "ASSE LAVALLEJA", ]
+base_ASSE_LAVALLEJA <- base_ASSE_LAVALLEJA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_LAVALLEJA <- fill(base_ASSE_LAVALLEJA, colnames(base_ASSE_LAVALLEJA))
+for(i in 1:nrow(base_ASSE_LAVALLEJA)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_LAVALLEJA)){
+    if (is.na(base_ASSE_LAVALLEJA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_LAVALLEJA)-1)){
+    base_ASSE_LAVALLEJA[i,-1] <- base_ASSE_LAVALLEJA[i-1,-1]
+  }
+}
+
+base_CRAME <- base[base$nombre == "CRAME", ]
+base_CRAME <- base_CRAME %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CRAME <- fill(base_CRAME, colnames(base_CRAME))
+for(i in 1:nrow(base_CRAME)){
+  suma_na<-0
+  for (j in 2: ncol(base_CRAME)){
+    if (is.na(base_CRAME[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CRAME)-1)){
+    base_CRAME[i,-1] <- base_CRAME[i-1,-1]
+  }
+}
+
+base_AMDM_IAMPP <- base[base$nombre == "AMDM IAMPP", ]
+base_AMDM_IAMPP <- base_AMDM_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_AMDM_IAMPP <- fill(base_AMDM_IAMPP, colnames(base_AMDM_IAMPP))
+for(i in 1:nrow(base_AMDM_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_AMDM_IAMPP)){
+    if (is.na(base_AMDM_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_AMDM_IAMPP)-1)){
+    base_AMDM_IAMPP[i,-1] <- base_AMDM_IAMPP[i-1,-1]
+  }
+}
+
+base_ASSE_MALDONADO <- base[base$nombre == "ASSE MALDONADO", ]
+base_ASSE_MALDONADO <- base_ASSE_MALDONADO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_MALDONADO <- fill(base_ASSE_MALDONADO, colnames(base_ASSE_MALDONADO))
+for(i in 1:nrow(base_ASSE_MALDONADO)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_MALDONADO)){
+    if (is.na(base_ASSE_MALDONADO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_MALDONADO)-1)){
+    base_ASSE_MALDONADO[i,-1] <- base_ASSE_MALDONADO[i-1,-1]
+  }
+}
+
+base_CASA_DE_GALICIA <- base[base$nombre == "CASA DE GALICIA", ]
+base_CASA_DE_GALICIA <- base_CASA_DE_GALICIA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CASA_DE_GALICIA <- fill(base_CASA_DE_GALICIA, colnames(base_CASA_DE_GALICIA))
+for(i in 1:nrow(base_CASA_DE_GALICIA)){
+  suma_na<-0
+  for (j in 2: ncol(base_CASA_DE_GALICIA)){
+    if (is.na(base_CASA_DE_GALICIA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CASA_DE_GALICIA)-1)){
+    base_CASA_DE_GALICIA[i,-1] <- base_CASA_DE_GALICIA[i-1,-1]
+  }
+}
+
+base_ASSE_PASTEUR <- base[base$nombre == "ASSE PASTEUR", ]
+base_ASSE_PASTEUR <- base_ASSE_PASTEUR %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_PASTEUR <- fill(base_ASSE_PASTEUR, colnames(base_ASSE_PASTEUR))
+for(i in 1:nrow(base_ASSE_PASTEUR)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_PASTEUR)){
+    if (is.na(base_ASSE_PASTEUR[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_PASTEUR)-1)){
+    base_ASSE_PASTEUR[i,-1] <- base_ASSE_PASTEUR[i-1,-1]
+  }
+}
+
+base_SANATORIO_AMERICANO <- base[base$nombre == "SANATORIO AMERICANO", ]
+base_SANATORIO_AMERICANO <- base_SANATORIO_AMERICANO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_SANATORIO_AMERICANO <- fill(base_SANATORIO_AMERICANO, colnames(base_SANATORIO_AMERICANO))
+for(i in 1:nrow(base_SANATORIO_AMERICANO)){
+  suma_na<-0
+  for (j in 2: ncol(base_SANATORIO_AMERICANO)){
+    if (is.na(base_SANATORIO_AMERICANO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_SANATORIO_AMERICANO)-1)){
+    base_SANATORIO_AMERICANO[i,-1] <- base_SANATORIO_AMERICANO[i-1,-1]
+  }
+}
+
+base_ASOCIACION_ESPAÑOLA <- base[base$nombre == "ASOCIACION ESPAÑOLA", ]
+base_ASOCIACION_ESPAÑOLA <- base_ASOCIACION_ESPAÑOLA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASOCIACION_ESPAÑOLA <- fill(base_ASOCIACION_ESPAÑOLA, colnames(base_ASOCIACION_ESPAÑOLA))
+for(i in 1:nrow(base_ASOCIACION_ESPAÑOLA)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASOCIACION_ESPAÑOLA)){
+    if (is.na(base_ASOCIACION_ESPAÑOLA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASOCIACION_ESPAÑOLA)-1)){
+    base_ASOCIACION_ESPAÑOLA[i,-1] <- base_ASOCIACION_ESPAÑOLA[i-1,-1]
+  }
+}
+
+base_CCOU <- base[base$nombre == "CCOU", ]
+base_CCOU <- base_CCOU %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CCOU <- fill(base_CCOU, colnames(base_CCOU))
+for(i in 1:nrow(base_CCOU)){
+  suma_na<-0
+  for (j in 2: ncol(base_CCOU)){
+    if (is.na(base_CCOU[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CCOU)-1)){
+   base_CCOU[i,-1] <- base_CCOU[i-1,-1]
+  }
+}
+
+base_CUDAM <- base[base$nombre == "CUDAM", ]
+base_CUDAM <- base_CUDAM %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CUDAM <- fill(base_CUDAM, colnames(base_CUDAM))
+for(i in 1:nrow(base_CUDAM)){
+  suma_na<-0
+  for (j in 2: ncol(base_CUDAM)){
+    if (is.na(base_CUDAM[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CUDAM)-1)){
+   base_CUDAM[i,-1] <- base_CUDAM[i-1,-1]
+  }
+}
+
+base_HOSPITAL_EVANGELICO <- base[base$nombre == "HOSPITAL EVANGELICO", ]
+base_HOSPITAL_EVANGELICO <- base_HOSPITAL_EVANGELICO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_HOSPITAL_EVANGELICO <- fill(base_HOSPITAL_EVANGELICO, colnames(base_HOSPITAL_EVANGELICO))
+for(i in 1:nrow(base_HOSPITAL_EVANGELICO)){
+  suma_na<-0
+  for (j in 2: ncol(base_HOSPITAL_EVANGELICO)){
+    if (is.na(base_HOSPITAL_EVANGELICO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_HOSPITAL_EVANGELICO)-1)){
+   base_HOSPITAL_EVANGELICO[i,-1] <- base_HOSPITAL_EVANGELICO[i-1,-1]
+  }
+}
+
+base_UNIVERSAL <- base[base$nombre == "UNIVERSAL", ]
+base_UNIVERSAL <- base_UNIVERSAL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_UNIVERSAL <- fill(base_UNIVERSAL, colnames(base_UNIVERSAL))
+for(i in 1:nrow(base_UNIVERSAL)){
+  suma_na<-0
+  for (j in 2: ncol(base_UNIVERSAL)){
+    if (is.na(base_UNIVERSAL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_UNIVERSAL)-1)){
+   base_UNIVERSAL[i,-1] <- base_UNIVERSAL[i-1,-1]
+  }
+}
+
+base_ASSE_ESPAÑOL <- base[base$nombre == "ASSE ESPAÑOL", ]
+base_ASSE_ESPAÑOL <- base_ASSE_ESPAÑOL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_ESPAÑOL <- fill(base_ASSE_ESPAÑOL, colnames(base_ASSE_ESPAÑOL))
+for(i in 1:nrow(base_ASSE_ESPAÑOL)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_ESPAÑOL)){
+    if (is.na(base_ASSE_ESPAÑOL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_ESPAÑOL)-1)){
+   base_ASSE_ESPAÑOL[i,-1] <- base_ASSE_ESPAÑOL[i-1,-1]
+  }
+}
+
+base_SMI <- base[base$nombre == "SMI", ]
+base_SMI <- base_SMI %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_SMI <- fill(base_SMI, colnames(base_SMI))
+for(i in 1:nrow(base_SMI)){
+  suma_na<-0
+  for (j in 2: ncol(base_SMI)){
+    if (is.na(base_SMI[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_SMI)-1)){
+   base_SMI[i,-1] <- base_SMI[i-1,-1]
+  }
+}
+
+base_UDELAR <- base[base$nombre == "UDELAR", ]
+base_UDELAR <- base_UDELAR %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_UDELAR <- fill(base_UDELAR, colnames(base_UDELAR))
+for(i in 1:nrow(base_UDELAR)){
+  suma_na<-0
+  for (j in 2: ncol(base_UDELAR)){
+    if (is.na(base_UDELAR[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_UDELAR)-1)){
+   base_UDELAR[i,-1] <- base_UDELAR[i-1,-1]
+  }
+}
+
+base_HOSPITAL_BRITANICO <- base[base$nombre == "HOSPITAL BRITANICO", ]
+base_HOSPITAL_BRITANICO <- base_HOSPITAL_BRITANICO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_HOSPITAL_BRITANICO <- fill(base_HOSPITAL_BRITANICO, colnames(base_HOSPITAL_BRITANICO))
+for(i in 1:nrow(base_HOSPITAL_BRITANICO)){
+  suma_na<-0
+  for (j in 2: ncol(base_HOSPITAL_BRITANICO)){
+    if (is.na(base_HOSPITAL_BRITANICO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_HOSPITAL_BRITANICO)-1)){
+   base_HOSPITAL_BRITANICO[i,-1] <- base_HOSPITAL_BRITANICO[i-1,-1]
+  }
+}
+
+base_HOSPITAL_CENTRAL_FF.AA. <- base[base$nombre == "HOSPITAL CENTRAL FF.AA.", ]
+base_HOSPITAL_CENTRAL_FF.AA. <- base_HOSPITAL_CENTRAL_FF.AA. %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_HOSPITAL_CENTRAL_FF.AA. <- fill(base_HOSPITAL_CENTRAL_FF.AA., colnames(base_HOSPITAL_CENTRAL_FF.AA.))
+for(i in 1:nrow(base_HOSPITAL_CENTRAL_FF.AA.)){
+  suma_na<-0
+  for (j in 2: ncol(base_HOSPITAL_CENTRAL_FF.AA.)){
+    if (is.na(base_HOSPITAL_CENTRAL_FF.AA.[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_HOSPITAL_CENTRAL_FF.AA.)-1)){
+   base_HOSPITAL_CENTRAL_FF.AA.[i,-1] <- base_HOSPITAL_CENTRAL_FF.AA.[i-1,-1]
+  }
+}
+
+base_CASMU_SANATORIO_3 <- base[base$nombre == "CASMU - SANATORIO 3", ]
+base_CASMU_SANATORIO_3 <- base_CASMU_SANATORIO_3 %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CASMU_SANATORIO_3 <- fill(base_CASMU_SANATORIO_3, colnames(base_CASMU_SANATORIO_3))
+for(i in 1:nrow(base_CASMU_SANATORIO_3)){
+  suma_na<-0
+  for (j in 2: ncol(base_CASMU_SANATORIO_3)){
+    if (is.na(base_CASMU_SANATORIO_3[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CASMU_SANATORIO_3)-1)){
+   base_CASMU_SANATORIO_3[i,-1] <- base_CASMU_SANATORIO_3[i-1,-1]
+  }
+}
+
+base_MUCAM <- base[base$nombre == "MUCAM", ]
+base_MUCAM <- base_MUCAM %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_MUCAM <- fill(base_MUCAM, colnames(base_MUCAM))
+for(i in 1:nrow(base_MUCAM)){
+  suma_na<-0
+  for (j in 2: ncol(base_MUCAM)){
+    if (is.na(base_MUCAM[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_MUCAM)-1)){
+   base_MUCAM[i,-1] <- base_MUCAM[i-1,-1]
+  }
+}
+
+base_CASMU_IAMPP <- base[base$nombre == "CASMU-IAMPP", ]
+base_CASMU_IAMPP <- base_CASMU_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CASMU_IAMPP <- fill(base_CASMU_IAMPP, colnames(base_CASMU_IAMPP))
+for(i in 1:nrow(base_CASMU_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CASMU_IAMPP)){
+    if (is.na(base_CASMU_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CASMU_IAMPP)-1)){
+   base_CASMU_IAMPP[i,-1] <- base_CASMU_IAMPP[i-1,-1]
+  }
+}
+
+base_HOSPITAL_POLICIAL <- base[base$nombre == "HOSPITAL POLICIAL", ]
+base_HOSPITAL_POLICIAL <- base_HOSPITAL_POLICIAL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_HOSPITAL_POLICIAL <- fill(base_HOSPITAL_POLICIAL, colnames(base_HOSPITAL_POLICIAL))
+for(i in 1:nrow(base_HOSPITAL_POLICIAL)){
+  suma_na<-0
+  for (j in 2: ncol(base_HOSPITAL_POLICIAL)){
+    if (is.na(base_HOSPITAL_POLICIAL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_HOSPITAL_POLICIAL)-1)){
+   base_HOSPITAL_POLICIAL[i,-1] <- base_HOSPITAL_POLICIAL[i-1,-1]
+  }
+}
+
+base_ASSE_MACIEL <- base[base$nombre == "ASSE MACIEL", ]
+base_ASSE_MACIEL <- base_ASSE_MACIEL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_MACIEL <- fill(base_ASSE_MACIEL, colnames(base_ASSE_MACIEL))
+for(i in 1:nrow(base_ASSE_MACIEL)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_MACIEL)){
+    if (is.na(base_ASSE_MACIEL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_MACIEL)-1)){
+   base_ASSE_MACIEL[i,-1] <- base_ASSE_MACIEL[i-1,-1]
+  }
+}
+
+base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL <- base[base$nombre == "ASSE - CENTRO HOSPITALARIO PEREIRA ROSSELL", ]
+base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL <- base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL <- fill(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL, colnames(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL))
+for(i in 1:nrow(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL)){
+    if (is.na(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL)-1)){
+   base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL[i,-1] <- base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL[i-1,-1]
+  }
+}
+
+base_ASSE_INOT <- base[base$nombre == "ASSE INOT", ]
+base_ASSE_INOT <- base_ASSE_INOT %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_INOT <- fill(base_ASSE_INOT, colnames(base_ASSE_INOT))
+for(i in 1:nrow(base_ASSE_INOT)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_INOT)){
+    if (is.na(base_ASSE_INOT[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_INOT)-1)){
+   base_ASSE_INOT[i,-1] <- base_ASSE_INOT[i-1,-1]
+  }
+}
+
+base_COMEPA <- base[base$nombre == "COMEPA", ]
+base_COMEPA <- base_COMEPA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+for(i in 1:nrow(base_COMEPA)){
+  suma_na<-0
+  for (j in 2: ncol(base_COMEPA)){
+    if (is.na(base_COMEPA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMEPA)-1)){
+    base_COMEPA[i,-1] <- base_COMEPA[i-1,-1]
+  }
+}
+
+
+#base_COMEPA2 <- base[base$nombre == "COMEPA", ]
+#base_COMEPA2 <- base_COMEPA2 %>%
+#  mutate(last_edited_date = as_date(last_edited_date)) %>%
+#  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMEPA2 <- fill(base_COMEPA2, colnames(base_COMEPA2))
+
+base_ASSE_PAYSANDU <- base[base$nombre == "ASSE PAYSANDU", ]
+base_ASSE_PAYSANDU <- base_ASSE_PAYSANDU %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_PAYSANDU <- fill(base_ASSE_PAYSANDU, colnames(base_ASSE_PAYSANDU))
+for(i in 1:nrow(base_ASSE_PAYSANDU)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_PAYSANDU)){
+    if (is.na(base_ASSE_PAYSANDU[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_PAYSANDU)-1)){
+   base_ASSE_PAYSANDU[i,-1] <- base_ASSE_PAYSANDU[i-1,-1]
+  }
+}
+
+base_AMEDRIN <- base[base$nombre == "AMEDRIN", ]
+base_AMEDRIN <- base_AMEDRIN %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_AMEDRIN <- fill(base_AMEDRIN, colnames(base_AMEDRIN))
+for(i in 1:nrow(base_AMEDRIN)){
+  suma_na<-0
+  for (j in 2: ncol(base_AMEDRIN)){
+    if (is.na(base_AMEDRIN[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_AMEDRIN)-1)){
+   base_AMEDRIN[i,-1] <- base_AMEDRIN[i-1,-1]
+  }
+}
+
+base_CAMY_IAMPP <- base[base$nombre == "CAMY IAMPP", ]
+base_CAMY_IAMPP <- base_CAMY_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMY_IAMPP <- fill(base_CAMY_IAMPP, colnames(base_CAMY_IAMPP))
+for(i in 1:nrow(base_CAMY_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMY_IAMPP)){
+    if (is.na(base_CAMY_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMY_IAMPP)-1)){
+   base_CAMY_IAMPP[i,-1] <- base_CAMY_IAMPP[i-1,-1]
+  }
+}
+
+base_CASMER_IAMPP <- base[base$nombre == "CASMER IAMPP", ]
+base_CASMER_IAMPP <- base_CASMER_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CASMER_IAMPP <- fill(base_CASMER_IAMPP, colnames(base_CASMER_IAMPP))
+for(i in 1:nrow(base_CASMER_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CASMER_IAMPP)){
+    if (is.na(base_CASMER_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CASMER_IAMPP)-1)){
+   base_CASMER_IAMPP[i,-1] <- base_CASMER_IAMPP[i-1,-1]
+  }
+}
+
+base_COMERI <- base[base$nombre == "COMERI", ]
+base_COMERI <- base_COMERI %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMERI <- fill(base_COMERI, colnames(base_COMERI))
+for(i in 1:nrow(base_COMERI)){
+  suma_na<-0
+  for (j in 2: ncol(base_COMERI)){
+    if (is.na(base_COMERI[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMERI)-1)){
+   base_COMERI[i,-1] <- base_COMERI[i-1,-1]
+  }
+}
+
+base_CASMER_IAMPP <- base[base$nombre == "CASMER IAMPP", ]
+base_CASMER_IAMPP <- base_CASMER_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CASMER_IAMPP <- fill(base_CASMER_IAMPP, colnames(base_CASMER_IAMPP))
+for(i in 1:nrow(base_CASMER_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CASMER_IAMPP)){
+    if (is.na(base_CASMER_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CASMER_IAMPP)-1)){
+   base_CASMER_IAMPP[i,-1] <- base_CASMER_IAMPP[i-1,-1]
+  }
+}
+
+base_ASSE_RIVERA <- base[base$nombre == "ASSE RIVERA", ]
+base_ASSE_RIVERA <- base_ASSE_RIVERA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_RIVERA <- fill(base_ASSE_RIVERA, colnames(base_ASSE_RIVERA))
+for(i in 1:nrow(base_ASSE_RIVERA)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_RIVERA)){
+    if (is.na(base_ASSE_RIVERA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_RIVERA)-1)){
+   base_ASSE_RIVERA[i,-1] <- base_ASSE_RIVERA[i-1,-1]
+  }
+}
+
+base_COMERO_IAMPP <- base[base$nombre == "COMERO IAMPP", ]
+base_COMERO_IAMPP <- base_COMERO_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMERO_IAMPP <- fill(base_COMERO_IAMPP, colnames(base_COMERO_IAMPP))
+for(i in 1:nrow(base_COMERO_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_COMERO_IAMPP)){
+    if (is.na(base_COMERO_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMERO_IAMPP)-1)){
+   base_COMERO_IAMPP[i,-1] <- base_COMERO_IAMPP[i-1,-1]
+  }
+}
+
+
+base_SANATORIO_PANAMERICANO <- base[base$nombre == "SANATORIO PANAMERICANO", ]
+base_SANATORIO_PANAMERICANO <- base_SANATORIO_PANAMERICANO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+base_SANATORIO_PANAMERICANO <- fill(base_SANATORIO_PANAMERICANO, colnames(base_SANATORIO_PANAMERICANO))
+#base_COMERO_IAMPP <- fill(base_COMERO_IAMPP, colnames(base_COMERO_IAMPP))
+for(i in 1:nrow(base_SANATORIO_PANAMERICANO)){
+  suma_na<-0
+  for (j in 2: ncol(base_SANATORIO_PANAMERICANO)){
+    if (is.na(base_SANATORIO_PANAMERICANO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_SANATORIO_PANAMERICANO)-1)){
+   base_SANATORIO_PANAMERICANO[i,-1] <- base_SANATORIO_PANAMERICANO[i-1,-1]
+  }
+}
+
+base_ASSE_SALTO <- base[base$nombre == "ASSE SALTO", ]
+base_ASSE_SALTO <- base_ASSE_SALTO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_SALTO <- fill(base_ASSE_SALTO, colnames(base_ASSE_SALTO))
+for(i in 1:nrow(base_ASSE_SALTO)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_SALTO)){
+    if (is.na(base_ASSE_SALTO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_SALTO)-1)){
+   base_ASSE_SALTO[i,-1] <- base_ASSE_SALTO[i-1,-1]
+  }
+}
+
+base_AMSJ_IAMPP <- base[base$nombre == "AMSJ IAMPP", ]
+base_AMSJ_IAMPP <- base_AMSJ_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_AMSJ_IAMPP <- fill(base_AMSJ_IAMPP, colnames(base_AMSJ_IAMPP))
+for(i in 1:nrow(base_AMSJ_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_AMSJ_IAMPP)){
+    if (is.na(base_AMSJ_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_AMSJ_IAMPP)-1)){
+   base_AMSJ_IAMPP[i,-1] <- base_AMSJ_IAMPP[i-1,-1]
+  }
+}
+
+base_CAMS_IAMPP <- base[base$nombre == "CAMS - IAMPP", ]
+base_CAMS_IAMPP <- base_CAMS_IAMPP %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_CAMS_IAMPP <- fill(base_CAMS_IAMPP, colnames(base_CAMS_IAMPP))
+for(i in 1:nrow(base_CAMS_IAMPP)){
+  suma_na<-0
+  for (j in 2: ncol(base_CAMS_IAMPP)){
+    if (is.na(base_CAMS_IAMPP[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_CAMS_IAMPP)-1)){
+   base_CAMS_IAMPP[i,-1] <- base_CAMS_IAMPP[i-1,-1]
+  }
+}
+
+
+base_COMTA <- base[base$nombre == "COMTA", ]
+base_COMTA <- base_COMTA %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_COMTA <- fill(base_COMTA, colnames(base_COMTA))
+for(i in 1:nrow(base_COMTA)){
+  suma_na<-0
+  for (j in 2: ncol(base_COMTA)){
+    if (is.na(base_COMTA[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_COMTA)-1)){
+   base_COMTA[i,-1] <- base_COMTA[i-1,-1]
+  }
+}
+
+base_ASSE_TACUAREMBO <- base[base$nombre == "ASSE TACUAREMBO", ]
+base_ASSE_TACUAREMBO <- base_ASSE_TACUAREMBO %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_TACUAREMBO <- fill(base_ASSE_TACUAREMBO, colnames(base_ASSE_TACUAREMBO))
+for(i in 1:nrow(base_ASSE_TACUAREMBO)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_TACUAREMBO)){
+    if (is.na(base_ASSE_TACUAREMBO[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_TACUAREMBO)-1)){
+   base_ASSE_TACUAREMBO[i,-1] <- base_ASSE_TACUAREMBO[i-1,-1]
+  }
+}
+
+base_IAC <- base[base$nombre == "IAC", ]
+base_IAC <- base_IAC %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_IAC <- fill(base_IAC, colnames(base_IAC))
+for(i in 1:nrow(base_IAC)){
+  suma_na<-0
+  for (j in 2: ncol(base_IAC)){
+    if (is.na(base_IAC[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_IAC)-1)){
+   base_IAC[i,-1] <- base_IAC[i-1,-1]
+  }
+}
+
+base_ASSE_TREINTAyTRES <- base[base$nombre == "ASSE TREINTA y TRES", ]
+base_ASSE_TREINTAyTRES <- base_ASSE_TREINTAyTRES %>%
+  mutate(last_edited_date = as_date(last_edited_date)) %>%
+  complete(last_edited_date = seq.Date(min(last_edited_date), max(last_edited_date), by="day"))
+#base_ASSE_TREINTAyTRES <- fill(base_ASSE_TREINTAyTRES, colnames(base_ASSE_TREINTAyTRES))
+for(i in 1:nrow(base_ASSE_TREINTAyTRES)){
+  suma_na<-0
+  for (j in 2: ncol(base_ASSE_TREINTAyTRES)){
+    if (is.na(base_ASSE_TREINTAyTRES[i,j])){
+      suma_na<-suma_na+1
+    }
+  }
+  if (suma_na==(ncol(base_ASSE_TREINTAyTRES)-1)){
+   base_ASSE_TREINTAyTRES[i,-1] <- base_ASSE_TREINTAyTRES[i-1,-1]
+  }
+}
+
+
+
+```
+
+```{r data.frame.total, echo=FALSE}
+
+base <- rbind(base_GREMEDA_IAMPP, base_COMECA_IAMPP, base_CRAMI, base_CAAMEPA_IAMPP, base_ASSE_LAS_PIEDRAS, 
+              base_CAMCEL, base_CAMEC, base_CAMEC_IAMPP, base_CAMOC_IAMPP, base_CAMEDUR, base_COMEF, base_ASSE_FLORIDA,
+              base_CAMDEL_IAMPP, base_ASSE_LAVALLEJA, base_CRAME, base_AMDM_IAMPP, base_ASSE_MALDONADO, base_SANATORIO_AMERICANO,
+              base_ASOCIACION_ESPAÑOLA, base_CCOU, base_CUDAM, base_HOSPITAL_EVANGELICO, base_UNIVERSAL, base_ASSE_ESPAÑOL,
+              base_CASA_DE_GALICIA, base_ASSE_PASTEUR, base_SMI, base_HOSPITAL_BRITANICO, base_HOSPITAL_CENTRAL_FF.AA. , 
+              base_CASMU_SANATORIO_3, base_MUCAM, base_CASMU_IAMPP, base_HOSPITAL_POLICIAL, base_ASSE_MACIEL, 
+              base_ASSE_CENTRO_HOSPITALARIO_PEREIRA_ROSSELL, base_UDELAR, base_ASSE_INOT, base_COMEPA, base_ASSE_PAYSANDU,
+              base_AMEDRIN, base_CAMY_IAMPP, base_CASMER_IAMPP, base_COMERI, base_ASSE_RIVERA, base_COMERO_IAMPP,
+              base_SANATORIO_PANAMERICANO, base_ASSE_SALTO, base_AMSJ_IAMPP, base_CAMS_IAMPP, base_COMTA, base_ASSE_TACUAREMBO,
+              base_IAC, base_ASSE_TREINTAyTRES, base_ASSE_COLONIA)
+
+
+
+```
+
+```{r , echo=FALSE, warning=FALSE}
+
+base$cam_tot_disp_inst <- as.numeric(as.character(base$cam_tot_disp_inst))
+base$cam_cti_libres <- as.numeric(as.character(base$cam_cti_libres))
+base$cam_cti_hab <- as.numeric(as.character(base$cam_cti_hab))
+base$cam_cti_bloq <- as.numeric(as.character(base$cam_cti_bloq))
+base$cam_cti_ocu_tot <- as.numeric(as.character(base$cam_cti_ocu_tot))
+base$cam_cti_ocu_covid19 <- as.numeric(as.character(base$cam_cti_ocu_covid19))
+base$cam_cti_ocu_rag <- as.numeric(as.character(base$cam_cti_ocu_rag))
+base$cam_cti_ocu_otro <- as.numeric(as.character(base$cam_cti_ocu_otro))
+base$cam_cti_amp <- as.numeric(as.character(base$cam_cti_amp))
+
+base$cam_ci_libres <- as.numeric(as.character(base$cam_ci_libres))
+base$cam_ci_hab <- as.numeric(as.character(base$cam_ci_hab))
+base$cam_ci_bloq <- as.numeric(as.character(base$cam_ci_bloq))
+base$cam_ci_ocu_tot <- as.numeric(as.character(base$cam_ci_ocu_tot))
+base$cam_ci_ocu_covid19 <- as.numeric(as.character(base$cam_ci_ocu_covid19))
+base$cam_ci_ocu_rag <- as.numeric(as.character(base$cam_ci_ocu_rag))
+base$cam_ci_ocu_otro <- as.numeric(as.character(base$cam_ci_ocu_otro))
+base$cam_ci_amp <- as.numeric(as.character(base$cam_ci_amp))
+
+base$cam_ic_hab <- as.numeric(as.character(base$cam_ic_hab))
+base$cam_ic_bloq <- as.numeric(as.character(base$cam_ic_bloq))
+
+base$cam_ic_hab[is.na(base$cam_ic_hab)] <- 0
+base$cam_ic_bloq[is.na(base$cam_ic_bloq)] <- 0 
+
+
+base$dotación2 <- base$cam_ci_bloq + base$cam_cti_bloq + base$cam_ic_bloq + base$cam_ci_hab + base$cam_cti_hab + base$cam_ic_hab
+base$dotación <- base$cam_ci_bloq + base$cam_cti_bloq + base$cam_ci_hab + base$cam_cti_hab
+
+write.csv2(base, file="base.csv", row.names = F)
+
+```
+
+```{r ultimo.ingreso, echo=FALSE}
+ultimo.ingreso <- subset(base, last_edited_date == max(base$last_edited_date))
+
+ultimo.ingreso$cam_tot_disp_inst <- as.numeric(as.character(ultimo.ingreso$cam_tot_disp_inst))
+ultimo.ingreso$cam_cti_libres <- as.numeric(as.character(ultimo.ingreso$cam_cti_libres))
+ultimo.ingreso$cam_cti_hab <- as.numeric(as.character(ultimo.ingreso$cam_cti_hab))
+ultimo.ingreso$cam_cti_bloq <- as.numeric(as.character(ultimo.ingreso$cam_cti_bloq))
+ultimo.ingreso$cam_cti_ocu_tot <- as.numeric(as.character(ultimo.ingreso$cam_cti_ocu_tot))
+ultimo.ingreso$cam_cti_ocu_covid19 <- as.numeric(as.character(ultimo.ingreso$cam_cti_ocu_covid19))
+ultimo.ingreso$cam_cti_ocu_rag <- as.numeric(as.character(ultimo.ingreso$cam_cti_ocu_rag))
+ultimo.ingreso$cam_cti_ocu_otro <- as.numeric(as.character(ultimo.ingreso$cam_cti_ocu_otro))
+ultimo.ingreso$cam_cti_amp <- as.numeric(as.character(ultimo.ingreso$cam_cti_amp))
+
+ultimo.ingreso$cam_ci_libres <- as.numeric(as.character(ultimo.ingreso$cam_ci_libres))
+ultimo.ingreso$cam_ci_hab <- as.numeric(as.character(ultimo.ingreso$cam_ci_hab))
+ultimo.ingreso$cam_ci_bloq <- as.numeric(as.character(ultimo.ingreso$cam_ci_bloq))
+ultimo.ingreso$cam_ci_ocu_tot <- as.numeric(as.character(ultimo.ingreso$cam_ci_ocu_tot))
+ultimo.ingreso$cam_ci_ocu_covid19 <- as.numeric(as.character(ultimo.ingreso$cam_ci_ocu_covid19))
+ultimo.ingreso$cam_ci_ocu_rag <- as.numeric(as.character(ultimo.ingreso$cam_ci_ocu_rag))
+ultimo.ingreso$cam_ci_ocu_otro <- as.numeric(as.character(ultimo.ingreso$cam_ci_ocu_otro))
+ultimo.ingreso$cam_ci_amp <- as.numeric(as.character(ultimo.ingreso$cam_ci_amp))
+
+ultimo.ingreso$cam_ic_hab <- as.numeric(as.character(ultimo.ingreso$cam_ic_hab))
+ultimo.ingreso$cam_ic_bloq <- as.numeric(as.character(ultimo.ingreso$cam_ic_bloq))
+
+total.camas <- sum(ultimo.ingreso$cam_tot_disp_inst)
+camas.habilitadas <- sum(ultimo.ingreso$cam_cti_hab, ultimo.ingreso$cam_ci_hab)  
+camas.bloqueadas <- sum(ultimo.ingreso$cam_cti_bloq, ultimo.ingreso$cam_ci_bloq)  
+camas.disponibles <- camas.habilitadas - camas.bloqueadas
+camas.libres <- sum(ultimo.ingreso$cam_cti_libres, ultimo.ingreso$cam_ci_libres)  
+camas.ocupadas <- sum(ultimo.ingreso$cam_cti_ocu_tot, ultimo.ingreso$cam_ci_ocu_tot)
+camas.ocu_covid <- sum(ultimo.ingreso$cam_cti_ocu_covid19, ultimo.ingreso$cam_ci_ocu_covid19)
+camas.ocu_Rag <- sum(ultimo.ingreso$cam_cti_ocu_rag, ultimo.ingreso$cam_ci_ocu_rag)
+camas.ocu_Otro <- sum(ultimo.ingreso$cam_cti_ocu_otro, ultimo.ingreso$cam_ci_ocu_otro)
+camas.ocu_Ampliado <- sum(ultimo.ingreso$cam_cti_amp, ultimo.ingreso$cam_ci_amp)
+
+ultimo.ingreso <- ultimo.ingreso[order(ultimo.ingreso$departamen, ultimo.ingreso$servicios, ultimo.ingreso$localidad,
+                                       ultimo.ingreso$nombre), ]
+```   
+
+```{r Instituciones, echo = FALSE}
+
+Instituciones <- data.frame(table(base$nombre, base$departamen, base$localidad, base$servicios))
+Instituciones$Freq <- as.numeric(as.integer(Instituciones$Freq))
+Instituciones[Instituciones == 0] <- NA
+Instituciones <- Instituciones[!is.na(Instituciones$Freq),]
+Instituciones <- Instituciones[order(Instituciones$Var2, Instituciones$Var4, Instituciones$Var3, Instituciones$Var1), ]
+
+Instituciones <- cbind(Instituciones, ultimo.ingreso$dotación)
+
+colnames(Instituciones) <- c("Institución", "Departamento", "Localidad", "Servicio", "Freq", "Dotación")
+Instituciones <- Instituciones[order(Instituciones$Departamento, Instituciones$Institución), ]
+
+Instituciones1 <- Instituciones[-c(19:38) , -5]
+Instituciones1 <- Instituciones1[order(desc(Instituciones1$Dotación)), ]
+
+Instituciones2 <- Instituciones[-c(1:18, 39:54) , -5]
+Instituciones2 <- Instituciones2[order(desc(Instituciones2$Dotación)), ]
+
+#write.csv2(Instituciones, file="Instituciones.csv", row.names = F)
+
+```
+
+
+**Introducción**
+
+El siguiente informe tiene como finalidad analizar los datos extraídos del Monitor Integral de Riesgos y Afectaciones (en adelante MIRA) del Sistema Nacional de Emergencias (Sinae), respecto a la disposición de las camas en los centros de cuidados críticos (tratamientos intensivos (CTI) e intermedio (CI)) en el Uruguay. 
+         
+El MIRA es el sistema central de información creado por la Dirección Nacional de Sinae con apoyo económico del Programa PNUD (Programa de las Naciones Unidas para el Desarrollo). Su principal objetivo es apoyar la toma de decisiones en la gestión integral de riesgos, permitiendo registrar información referente a eventos adversos y, generando estadísticas e indicadores de calidad agregada a nivel nacional con criterios estándares y homogéneos. La herramienta informática está desarrollada sobre una plataforma de un sistema de información geográfica GIS (Geographic Information System) utilizada a nivel mundial por distintas agencias de gobierno relacionadas a la gestión de riesgos y desastres (ESRI - https://www.esri.com/es-es/home).      
+          
+En el marco de la pandemia por Coronavirus COVID-19, el Sinae incorporó al MIRA varias capas de información de uso exclusivo de las autoridades para la definición de políticas y la toma de decisiones. En marzo de 2020 se diseñó un Monitor de recursos de centros de cuidados críticos. Dicho monitor se establece a principios de diciembre de 2020, mediante la Ordenanza Ministerial Nro. 1591, como el único medio obligatorio a los efectos de informar la disponibilidad de los recursos con los que disponen diariamente los centros de cuidados críticos a nivel nacional (tanto públicos como privados). Luego, el 20 de enero de 2021 el Sr. Ministro de Salud Dr. Daniel Salinas, ante la evolución de la pandemia de COVID-19 y en el contexto de un aumento progresivo de la demanda de camas de cuidados críticos, resolvió constituir la Mesa Coordinadora Nacional de Centros de Cuidados Críticos. El Sinae participa en este ámbito y se resuelve el rediseño del Módulo de recursos de CTI a los efectos de tener más elementos para la gestión eficiente de los recursos.        
+            
+Cuenta con información discriminada según diferentes niveles de atención (adultos, pediatría y neonatal) de las siguientes variables: dotación de camas; camas habilitadas; camas bloqueadas (discriminando si es por falta de recursos humanos, por falta de recursos materiales, porque requiere o está en reparación y otras causas); camas ocupadas (discriminando el tipo de diagnóstico COVID-19, infecciones respiratorias agudas y otros); camas libres para cualquier tipo de paciente y camas libres para recibir pacientes que requieren aislamiento respiratorio. También se detallan los porcentajes de ocupación; el número de ventiladores según diferentes tecnologías y la internación en cuidados moderados.     
+        
+El monitor permite visualizar el estado de ocupación de cada centro de salud, la ocupación a nivel departamental y a nivel nacional. También se visualizan los episodios de saturación en los servicios de emergencias a nivel nacional. Al estar georreferenciados, es posible identificar cuál es el centro de salud que se encuentra más cerca de una situación de emergencia y si tiene disponibilidad.        
+            
+Esta información brinda insumos de gran utilidad para los equipos asistenciales especialmente a la hora de tomar decisiones sobre traslados de pacientes, en tanto facilitan la identificación de aquellos centros que tienen disponibilidad para recibirlos.        
+
+A su vez, el 8 de abril de 2021 se pone a disposición de la población un visualizador que permite conocer la ocupación de camas en los centros de cuidados críticos. Es una herramienta que permite contar con información actualizada cada 60 minutos, de las variables anteriormente mencionadas, para los centros de cuidados críticos agregados a nivel nacional y para el nivel de atención adultos.      
+        
+Quienes suministran la información y por tanto constituyen la fuente son los prestadores de salud que tienen sedes de cuidados críticos en Uruguay que, de acuerdo a lo establecido en la Ordenanza Ministerial del MSP Nº 1591 de fecha 9 de diciembre de 2020, deben reportar con una frecuencia mínima diaria, el censo de recursos en el Monitor Integral de Riesgos y Afectaciones (MIRA).  
+              
+
+\vspace{0.5cm}
+
+**Prestadores de salud**      
+      
+Dado que es a partir del día 9 de diciembre 2020 que se resolvió la obligatoriedad del llenado de la información al sistema, la base de datos utilizada para el presente informe contempla desde dicha fecha hasta el día `r as.character(max(base$last_edited_date), format = "%d %B %Y")`.       
+        
+El monitor permite visualizar el estado de ocupación de cada centro de salud, la ocupación a nivel departamental y a nivel nacional. Son `r length(unique(Instituciones$Localidad))` las localidades donde se encuentran centros de tratamiento intensivo distribuidos en `r length(unique(Instituciones$Departamento))` departamentos. Flores es el único departamento que no cuenta con centros de cuidados críticos. Son `r length(unique(Instituciones$Institución))` las instituciones médicas que disponen de centros de CTI y CI en el territorio nacional. En Montevideo se localizan `r length(which(Instituciones$Localidad == "Montevideo"))` centros médicos y los restantes `r length(which(Instituciones$Localidad != "Montevideo"))` se encuentran dispersos en el resto del país.      
+
+
+\begin{center}
+Figura 1: Ubicación y nivel de ocupación de los Centros de Salud, al 1 de julio 2021
+\end{center}
+
+\vspace*{-0.7cm}
+
+```{r imagen, echo = FALSE, out.width = "45%", fig.align="center"}
+
+knitr::include_graphics("Centros de salud.jpg")
+
+```
+
+```{r escala1, echo = FALSE, out.width = "15%", fig.align="center"}
+
+knitr::include_graphics("Escala.jpg")
+
+```
+
+\vspace*{-0.7cm}
+
+\begin{center}
+Fuente: Mirador de Riesgos y Afectaciones, Sinae
+\end{center}
+
+De estos centros el `r round(length(which(Instituciones$Servicio == "Público"))/nrow(Instituciones)*100,0)`% (`r length(which(Instituciones$Servicio == "Público"))`) son públicos y el restante `r round(length(which(Instituciones$Servicio == "Privado"))/nrow(Instituciones)*100,0)`% (`r length(which(Instituciones$Servicio == "Privado"))`) privados. Dentro de los públicos, el `r round(length(which(str_sub(Instituciones$Institución, 1, 4) == "ASSE")) / length(which(Instituciones$Servicio == "Público"))*100,0)`% (`r length(which(str_sub(Instituciones$Institución, 1, 4)== "ASSE"))`) corresponden a ASSE, el resto son el Hospital Central FF.AA., Hospital Policial y UdelaR.        
+          
+          
+Las siguientes tablas detallan las instituciones por departamento, localidad, tipo de servicio y la cantidad de camas instaladas para funcionar en los centros de cuidados críticos.         
+   
+         
+\begin{center}          
+Tabla 1: Prestadores de salud en el interior del país
+\end{center}
+
+```{r , echo=FALSE}
+Instituciones1 <- data.table(Instituciones1)
+Instituciones1 %>%
+  kable(format = "latex", booktabs = FALSE, longtable = TRUE, vline = "") %>%
+  kable_styling(font_size = 7, bootstrap_options = "striped", row_label_position = "l", 
+                latex_options = "repeat_header", repeat_header_text = "(Continuación ...)") 
+
+```
+
+\begin{center}
+Fuente: Área de Información en base a los datos del MIRA, Sinae
+\end{center}
+
+\begin{center}
+Tabla 2: Prestadores de salud en Montevideo
+\end{center}
+
+```{r , echo=FALSE}
+Instituciones2 <- data.table(Instituciones2)
+Instituciones2 %>%
+  kable(format = "latex", booktabs = FALSE, longtable = TRUE, vline = "") %>%
+  kable_styling(font_size = 7, bootstrap_options = "striped", row_label_position = "l", 
+                latex_options = "repeat_header", repeat_header_text = "(Continuación ...)")
+
+```
+
+\begin{center}
+Fuente: Área de Información en base a los datos del MIRA, Sinae
+\end{center}
+
+
+**Información descriptiva de las camas en cuidados críticos**
+
+El Monitor cuenta con información diaria discriminada según diferentes niveles de atención (adultos, pediatría y neonatal) de las siguientes variables:         
+
+* **Camas de dotación**: son las camas instaladas en una sede para funcionar en condiciones de demanda normal.   
+
+* **Potencial de ampliación**: refiere a la cantidad de camas que podría agregarse a las de dotación en forma extraordinaria y transitoria, en respuesta a una situación de demanda crítica.   
+
+* **Camas bloqueadas**: son las camas de dotación que no se encuentran en condiciones de recibir pacientes por distintos motivos (reparación, carencia de recursos humanos o materiales, factores ambientales o edilicios, etc.).
+
+* **Camas disponibles**: son las camas que se encuentran en condiciones materiales y funcionales de recibir pacientes. Equivale a la diferencia: camas de dotación - camas bloqueadas.
+
+* **Camas ocupadas**: son las camas disponibles ocupadas por pacientes en el momento considerado. Según el diagnóstico de los pacientes se discriminan en: ocupadas por COVID, ocupadas por IRAG (Infección Respiratoria Aguda Grave) y ocupadas por otros diagnósticos.    
+
+* **Camas libres**: son las camas disponibles sin pacientes internados en el momento considerado.  Equivale a la diferencia: camas disponibles - camas ocupadas.          
+
+* **Camas libres para aislamiento respiratorio**: del total de camas libres, son las que, además de estar libres, se encuentran en condiciones de recibir pacientes que requieran aislamiento respiratorio.           
+
+* **Ocupación general (porcentaje ocupacional general)**: refiere a la proporción de las camas disponibles, ocupadas por pacientes con cualquier diagnóstico.              
+
+* **Ocupación por COVID (porcentaje ocupacional por COVID)**:  refiere a la proporción de las camas disponibles, ocupadas por pacientes con diagnóstico de COVID-19.    
+
+* **Número de ventiladores según diferentes tecnologías**       
+      
+           
+A su vez, se visualizan los episodios de saturación en los servicios de emergencias a nivel nacional. Al estar georreferenciados, es posible identificar cuál es el centro de salud que se encuentra más cerca de una situación de emergencia y si tiene disponibilidad.
+         
+\vspace{0.5cm}
+
+**_Cuidados críticos de las personas adultas a la fecha_**        
+
+Los centros asistenciales reportan un total de `r camas.habilitadas` camas disponibles al día `r as.character(max(base$last_edited_date), format = "%d %B %Y")`, de las cuales `r camas.libres` (`r round(camas.libres/camas.habilitadas*100,1)`%) se encuentran libres y `r camas.ocupadas` (`r round(camas.ocupadas/camas.habilitadas*100,1)`%) ocupadas en todo el territorio nacional.       
+       
+La cantidad de camas bloqueadas reportadas a ese día es de `r camas.bloqueadas` en todo el país.          
+         
+De las camas disponibles, el `r round(camas.ocupadas/camas.disponibles*100,1)`% se encuentran ocupadas por pacientes. Calculando el nivel de ocupación sobre el total de cama de dotación (considerando el total de camas) el valor desciende a `r round(camas.ocupadas/camas.habilitadas*100,1)`%.      
+      
+La ocupación de camas se puede diferenciar de acuerdo con el diagnóstico del paciente que la utiliza. Un `r round(camas.ocu_covid/camas.ocupadas*100,1)`% son pacientes con diagnostico confirmado de COVID-19, un `r round(camas.ocu_Rag/camas.ocupadas*100,1)`% son pacientes con insuficiencia respiratoria aguda (IRAG) de causa no confirmada COVID [^1] u otra etiología y el `r round(camas.ocu_Otro/camas.ocupadas*100,1)`% pacientes con diagnóstico diferente a los anteriormente expresados.             
+
+
+\begin{center}
+Gráfico 1: Distribución de ocupación de las camas
+\end{center}
+
+```{r evolución clinica, echo=FALSE}
+
+Ocupación <- c("Camas ocupadas COVID-19", "Camas ocupadas IRAG", "Camas ocupadas otros")
+Freq <- c(camas.ocu_covid, camas.ocu_Rag, camas.ocu_Otro)
+
+Ocupación <- cbind(Ocupación, Freq)
+DF.Ocupa <- data.frame(Ocupación)
+colnames(DF.Ocupa)<-c("Ocupación","Freq") ## Nueva línea de código
+DF.Ocupa$Freq <- as.numeric(as.character(DF.Ocupa$Freq))
+
+```
+    
+```{r ocupación, echo=FALSE, fig.height = 2, fig.width = 5, fig.align="center"}
+
+DF.Ocupa <- DF.Ocupa %>% 
+  mutate(prop = round((DF.Ocupa$Freq/sum(DF.Ocupa$Freq))*100,1)) %>%
+  mutate(ypos = cumsum(prop) - 0.5*prop)
+
+ggplot(DF.Ocupa, aes(x = "", y = prop, fill = Ocupación)) +
+      geom_bar(stat = "identity", width = 1, color = "white") +
+      theme_bw() + theme(axis.text.x = element_blank()) + 
+      coord_polar(theta = "y", start = 0, clip = "off") + theme_void() +   
+      scale_fill_manual(values = c("#3192FF", "#F99D1C", "#878787")) +
+      theme(panel.border = element_blank()) +
+      geom_text(aes(label = paste(prop, "%", sep = " ")), position = position_stack(vjust = 0.5), 
+                    size = 2.8, col = "black")
+
+
+```
+
+\begin{center}
+Fuente: Área de Información en base a los datos del MIRA, Sinae
+\end{center}
+       
+
+Existe la posibilidad de ampliación de camas en algunos centros, son aquellas camas que en condiciones normales no están destinadas a pacientes generales y/o respiratorios, pero que en una situación crítica del sistema pueden habilitarse para ellos (ejemplo: áreas especializadas, camas supernumerarias, etc.). En caso de activarse, estas camas pasan a engrosar el total de camas disponibles, habilitadas, y según corresponda, ocupadas o libres. Los centros reportan disponer de `r camas.ocu_Ampliado` camas para su ampliación el último día de registro.      
+
+      
+```{r ventilador, echo=FALSE}
+  
+ultimo.ingreso$vent_cant_total <- as.numeric(as.character(ultimo.ingreso$vent_cant_total))
+ultimo.ingreso$vent_cant_vni <- as.numeric(as.character(ultimo.ingreso$vent_cant_vni))
+ultimo.ingreso$vent_cant_oaf <- as.numeric(as.character(ultimo.ingreso$vent_cant_oaf))
+
+Ventilador.total <- sum(ultimo.ingreso$vent_cant_total)
+Ventilador.vni <- sum(ultimo.ingreso$vent_cant_vni)
+Ventilador.oaf <- sum(ultimo.ingreso$vent_cant_oaf)
+```
+      
+      
+Otra información importante que reporta el sistema es la cantidad de ventiladores de los que se dispone según la tecnología empleada. El día `r as.character(max(base$last_edited_date), format = "%d %B %Y")` se cuenta con una cantidad de **`r Ventilador.total ` ventiladores**, de los cuales el **`r round(Ventilador.vni/Ventilador.total*100,0)`%** (`r Ventilador.vni`) corresponden a la tecnología Ventilación No Invasiva (VNI) y el **`r round(Ventilador.oaf/Ventilador.total*100,0)`%** (`r Ventilador.oaf`) a la tecnología Oxigenoterapia de Alto Flujo (OAF).        
+       
+
+\begin{center}
+Figura 2: Ocupación por departamento y aislamiento respiratorio a nivel nacional, al 1 de julio 2021
+\end{center}      
+      
+```{r ocupacion, echo = FALSE, out.width = "50%", fig.align="center"}
+
+knitr::include_graphics("Ocupacion por depto y aislación respiratoria.jpg")
+
+```            
+
+```{r escala, echo = FALSE, out.width = "15%", fig.align="center"}
+
+knitr::include_graphics("Escala.jpg")
+
+```
+\begin{center}
+Fuente: Mirador de Riesgos y Afectaciones, Sinae
+\end{center}
+
+
+
+```{r ais_resp, echo=FALSE}
+
+ultimo.ingreso$ais_resp <- ultimo.ingreso$cam_ci_libres_ais_resp + ultimo.ingreso$cam_cti_libres_ais_resp
+
+```
+
+
+Finalmente, una variable de gran interés es el número de camas disponibles para recibir pacientes que requieren aislamiento respiratorio por cualquier motivo (en particular por tener diagnóstico de COVID positivo). Esta información nos da una idea más certera de la capacidad del sistema para dar respuesta a los ingresos de pacientes COVID que requieren cuidados intensivos o intermedios.
+    
+Al `r as.character(max(base$last_edited_date), format = "%d %B %Y")` la disponibilidad de camas con aislamiento respiratorio es de **`r sum(ultimo.ingreso$ais_resp)`** en todo el territorio nacional. El dato bajo se dió el 30 de mayo 2021 con 55 camas disponibles. 
+
+
+\begin{center}
+Gráfico 2: Evolución de las camas disponibles con aislamiento respiratorio en todo el territorio nacional
+\end{center}
+
+\vspace*{-0.7cm}
+
+```{r aislam.resp, echo=FALSE, fig.height = 3, fig.width = 9.5, fig.align = "center", message=FALSE, warning=FALSE}
+
+base2 <- subset(base, last_edited_date >= "2021-03-18 00:00:00")
+base2$Fecha <- lubridate::as_date(base2$last_edited_date)
+
+Serie.aisl.resp <- base2 %>%
+   group_by(Fecha) %>%
+   summarise(Ais_resp = sum(cam_ci_libres_ais_resp, cam_cti_libres_ais_resp))
+
+ggplot(data = Serie.aisl.resp, aes(x = Fecha, y = Ais_resp)) + 
+     geom_point(stat="identity") + xlab("") + ylab("") +
+     stat_smooth() +
+     theme(axis.text.x = element_text(angle = 0), legend.position="bottom", legend.text = element_text(size=12))
+
+```
+
+\vspace*{-0.7cm}
+
+\begin{center}
+Fuente: Área de Información en base a los datos del MIRA, Sinae
+\end{center}
+
+\newpage
+
+En las figuras a continuación se observa la distrubución de las camas disponibles con aislamiento respiratorio en los diferentes departamentos. En la capital del país se encuentra el `r round(sum(ultimo.ingreso$ais_resp[ultimo.ingreso$departamen == "Montevideo"]) / sum(ultimo.ingreso$ais_resp) * 100,1)`% (`r sum(ultimo.ingreso$ais_resp[ultimo.ingreso$departamen == "Montevideo"])`) y el `r round(sum(ultimo.ingreso$ais_resp[ultimo.ingreso$departamen != "Montevideo"]) / sum(ultimo.ingreso$ais_resp) * 100,1)`% (`r sum(ultimo.ingreso$ais_resp[ultimo.ingreso$departamen != "Montevideo"])`) restante en los departamentos del interior.  
+
+\begin{center}
+Figura 3: Disponibilidad de camas con aislamiento respitatorio para recibir pacientes en el territorio nacional, al 1 de julio 2021
+\end{center}
+
+\vspace*{-0.5cm}
+
+```{r respirat.país, echo = FALSE, out.width = "50%", fig.align="center"}
+
+knitr::include_graphics("Aislamiento_respiratorio_país.jpg")
+
+```
+
+\vspace*{-0.5cm}
+
+\begin{center}
+Fuente: Mirador de Riesgos y Afectaciones, Sinae
+\end{center}     
+      
+\begin{center}
+Figura 4: Disponibilidad de camas con aislamiento respitatorio para recibir pacientes en Montevideo, al 1 de julio 2021
+\end{center}      
+      
+\vspace*{-0.5cm} 
+
+```{r respiratorio.mont, echo = FALSE, out.width = "50%", fig.align="center"}
+
+knitr::include_graphics("Aislamiento_respiratorio_mont.jpeg")
+
+```      
+
+\vspace*{-0.5cm}
+
+\begin{center}      
+Fuente: Mirador de Riesgos y Afectaciones, Sinae
+\end{center}      
+      
+      
+      
+```{r, echo=FALSE, warning=FALSE}
+
+base$cam_tot_disp_inst <- as.numeric(as.character(base$cam_tot_disp_inst))
+base$cam_cti_libres <- as.numeric(as.character(base$cam_cti_libres))
+base$cam_cti_hab <- as.numeric(as.character(base$cam_cti_hab))
+base$cam_cti_bloq <- as.numeric(as.character(base$cam_cti_bloq))
+base$cam_cti_ocu_tot <- as.numeric(as.character(base$cam_cti_ocu_tot))
+base$cam_cti_ocu_covid19 <- as.numeric(as.character(base$cam_cti_ocu_covid19))
+base$cam_cti_ocu_rag <- as.numeric(as.character(base$cam_cti_ocu_rag))
+base$cam_cti_ocu_otro <- as.numeric(as.character(base$cam_cti_ocu_otro))
+base$cam_cti_amp <- as.numeric(as.character(base$cam_cti_amp))
+
+base$cam_ci_libres <- as.numeric(as.character(base$cam_ci_libres))
+base$cam_ci_hab <- as.numeric(as.character(base$cam_ci_hab))
+base$cam_ci_bloq <- as.numeric(as.character(base$cam_ci_bloq))
+base$cam_ci_ocu_tot <- as.numeric(as.character(base$cam_ci_ocu_tot))
+base$cam_ci_ocu_covid19 <- as.numeric(as.character(base$cam_ci_ocu_covid19))
+base$cam_ci_ocu_rag <- as.numeric(as.character(base$cam_ci_ocu_rag))
+base$cam_ci_ocu_otro <- as.numeric(as.character(base$cam_ci_ocu_otro))
+base$cam_ci_amp <- as.numeric(as.character(base$cam_ci_amp))
+
+```
+      
+\newpage
+           
+**Evolución en el tiempo**
+        
+```{r NAs, echo=FALSE, eval=FALSE}
+# Elimino filas de centros que no tienen dato al principio de su creación
+# en menos o igual a n ubicaciones por fila
+delete.na <- function(DF, n) {
+  DF[rowSums(is.na(DF)) <= n, ]
+}
+base <- delete.na(base, n=(ncol(base)-2))    
+
+base[is.na(base)] <- 0   #DA ERROR, LO DEJO SIN EFECTO
+```
+
+```{r variables, echo=FALSE}
+base$cam_cti_ocu_tot[is.na(base$cam_cti_ocu_tot)] <- 0
+base$cam_ci_ocu_tot[is.na(base$cam_ci_ocu_tot)] <- 0
+base$cam_cti_ocu_covid19[is.na(base$cam_cti_ocu_covid19)] <- 0
+base$cam_ci_ocu_covid19[is.na(base$cam_ci_ocu_covid19)] <- 0
+base$cam_cti_ocu_otro[is.na(base$cam_cti_ocu_otro)] <- 0
+base$cam_ci_ocu_otro[is.na(base$cam_ci_ocu_otro)] <- 0
+base$cam_cti_ocu_rag[is.na(base$cam_cti_ocu_rag)] <- 0
+base$cam_ci_ocu_rag[is.na(base$cam_ci_ocu_rag)] <- 0
+base$cam_cti_hab[is.na(base$cam_cti_hab)] <- 0
+base$cam_ci_hab[is.na(base$cam_ci_hab)] <- 0
+base$cam_cti_libres[is.na(base$cam_cti_libres)] <- 0
+base$cam_ci_libres[is.na(base$cam_ci_libres)] <- 0
+base$cam_cti_bloq[is.na(base$cam_cti_bloq)] <- 0
+base$cam_ci_bloq[is.na(base$cam_ci_bloq)] <- 0
+
+base$Cama.ocup <- (base$cam_cti_ocu_tot + base$cam_ci_ocu_tot)
+base$Ocup_COVID <- (base$cam_cti_ocu_covid19 + base$cam_ci_ocu_covid19)
+base$Ocup_otros <- (base$cam_cti_ocu_otro + base$cam_ci_ocu_otro)
+base$Ocup_IRAG <- (base$cam_cti_ocu_rag + base$cam_ci_ocu_rag)
+base$Dotación <- (base$cam_cti_hab + base$cam_ci_hab)
+base$Libres <- (base$cam_cti_libres + base$cam_ci_libres)
+base$Bloqueadas <- (base$cam_cti_bloq + base$cam_ci_bloq)
+base$Disponibles <- base$Cama.ocup + base$Libres
+#base$Disponibles <- (base$cam_cti_hab + base$cam_ci_hab) + (base$cam_cti_bloq + base$cam_ci_bloq)
+
+```
+        
+```{r disponibles, echo=FALSE, eval= FALSE}
+
+# Disponibles
+base$Disponibles <- 0
+
+for (i in 1:nrow(base)){
+    if(base[i,]$Fecha < '2021-04-01'){
+    base[i,]$Disponibles <- (base[i,]$cam_cti_hab + base[i,]$cam_cti_bloq) + (base[i,]$cam_ci_hab + base[i,]$cam_ci_bloq)
+  }else {
+    base[i,]$Disponibles <- (base[i,]$cam_cti_hab - base[i,]$cam_cti_bloq) + (base[i,]$cam_ci_hab - base[i,]$cam_ci_bloq)
+  }
+}
+
+```
+        
+        
+```{r serie, echo=FALSE}
+base2 <- subset(base, last_edited_date >= "2021-03-01 00:00:00")
+base2$Fecha <- lubridate::as_date(base2$last_edited_date)
+
+Serie <- base2 %>%
+   group_by(last_edited_date) %>%
+   summarise(Ocupa_total = sum(Cama.ocup), Disponibles = sum(Disponibles), Ocup_COVID = sum(Ocup_COVID),
+             Dotación = sum(Dotación), Libres = sum(Libres), Bloqueadas = sum(Bloqueadas),
+             Ocupa_otros = sum(Ocup_otros), Ocupa_IRAG = sum(Ocup_IRAG))
+
+DF.Serie1 <- cbind(Serie[ ,c(1,2)], rep("Ocupadas"))
+DF.Serie2 <- cbind(Serie[ ,c(1,3)], rep("Disponibles"))
+DF.Serie3 <- cbind(Serie[ ,c(1,4)], rep("Ocupadas COVID"))
+DF.Serie4 <- cbind(Serie[ ,c(1,5)], rep("Dotación"))
+DF.Serie5 <- cbind(Serie[ ,c(1,6)], rep("Libres"))
+DF.Serie6 <- cbind(Serie[ ,c(1,7)], rep("Bloqueadas"))
+DF.Serie7 <- cbind(Serie[ ,c(1,8)], rep("Ocupadas IRAG"))
+DF.Serie8 <- cbind(Serie[ ,c(1,9)], rep("Ocupadas otro"))
+
+
+colnames(DF.Serie1) <- c("Fecha","Freq", ".")
+colnames(DF.Serie2) <- c("Fecha","Freq", ".")
+colnames(DF.Serie3) <- c("Fecha","Freq", ".")
+colnames(DF.Serie4) <- c("Fecha","Freq", ".")
+colnames(DF.Serie5) <- c("Fecha","Freq", ".")
+colnames(DF.Serie6) <- c("Fecha","Freq", ".")
+colnames(DF.Serie7) <- c("Fecha","Freq", ".")
+colnames(DF.Serie8) <- c("Fecha","Freq", ".")
+
+DF.Serie <- rbind(DF.Serie1[,], DF.Serie2[,], DF.Serie3[,], DF.Serie4[,], DF.Serie5[,], DF.Serie6[,])
+DF.SerieA <- rbind(DF.Serie1[,], DF.Serie2[,], DF.Serie3[,])
+DF.SerieB <- rbind(DF.Serie2[,], DF.Serie5[,], DF.Serie1[,])
+DF.SerieC <- rbind(DF.Serie4[,], DF.Serie2[,], DF.Serie6[,])
+DF.SerieD <- rbind(DF.Serie1[,], DF.Serie3[,], DF.Serie7[,], DF.Serie8[,])
+
+
+```
+
+El estudio de la evolución en el tiempo de las variables consideradas en el MIRA se realiza desde el 1 de Marzo hasta el `r as.character(max(base$last_edited_date), format = "%d %B %Y")`.
+
+Se observa que fue a a mediados del mes de marzo donde comenzó un aumento consecutivo de la cantidad de camas disponibles, disminuyendo a su vez la cantidad de camas bloqueadas, por lo que existe un incremento por partida doble en las camas de dotación.      
+En promedio, en el período considerado, las camas bloqueadas representan un `r round(mean(Serie$Bloqueadas) / mean(Serie$Dotación)*100, 1)`% del total de la dotación.      
+      
+La evolución de las variables camas disponibles y camas bloqueadas se puede observar en el siguiente gráfico.         
+
+\begin{center}
+Gráfico 3: Evolución de las camas de disponibles y bloqueadas
+\end{center}
+
+\vspace*{-0.9cm} 
+
+```{r disponible, echo=FALSE, fig.height = 3.8, fig.width = 10.5, fig.align = "center", message=FALSE}
+
+SerieC3 <- base2 %>%
+   group_by(last_edited_date) %>%
+   summarise(Disponibles = sum(Disponibles), Bloqueadas = sum(Bloqueadas))
+
+DF.Serie.2 <- cbind(SerieC3[ ,c(1,2)], rep("Disponibles"))
+DF.Serie.6 <- cbind(SerieC3[ ,c(1,3)], rep("Bloqueadas"))
+colnames(DF.Serie.2) <- c("Fecha","Freq", ".")
+colnames(DF.Serie.6) <- c("Fecha","Freq", ".")
+DF.SerieC2 <- rbind(DF.Serie.6[,], DF.Serie.2[,])
+
+g <- ggplot(DF.SerieC2, aes(x = Fecha, y = Freq, fill = .))
+g + geom_bar(stat="identity", position=position_stack()) + 
+    scale_fill_manual(values=c("#3192FF", "#F99D1C", "#878787")) +
+    xlab("") + ylab("") + theme(legend.position = "bottom") + 
+    scale_y_continuous(breaks=seq(0, 1100, 100)) 
+
+```
+
+```{r graficoalterno, echo=FALSE, eval=FALSE, fig.height = 3.5, fig.width = 12, warning=FALSE, message=FALSE, fig.align="center"}
+base2 <- subset(base, last_edited_date >= "2021-03-01 00:00:00")
+DF.SerieC2 <- DF.SerieC[-c(1:91),]
+
+DF.Serie6_a<-DF.Serie6
+DF.Serie6_a$Freq<-10*DF.Serie6_a$Freq
+DF.Serie6_a<-subset(DF.Serie6_a, Fecha >= "2021-03-01 00:00:00")
+DF.Serie4_a<-subset(DF.Serie4, Fecha >= "2021-03-01 00:00:00")
+DF.Serie2_a<-subset(DF.Serie2, Fecha >= "2021-03-01 00:00:00")
+
+ggplot(rbind(DF.Serie4_a[,], DF.Serie2_a[,])[,1:3], aes(x = Fecha, y = Freq, color = .)) + 
+     geom_point(stat="identity", mapping = aes(x = Fecha, y = Freq, color = .)) +
+     stat_smooth() + ylab("Disponibles - Dotación") + xlab("") +
+     geom_point(DF.Serie6_a[,1:3], mapping = aes(x = Fecha, y = Freq, color = .)) +             
+     scale_y_continuous(sec.axis = sec_axis(~.*.1, name = "Bloqueadas")) +
+     theme(axis.text.x = element_text(angle = 0), legend.position="bottom", legend.text = element_text(size=12),
+           panel.border = element_blank())
+
+```
+
+\vspace*{-0.9cm}
+
+\begin{center}
+Fuente: Área de Información en base a los datos del MIRA, Sinae
+\end{center}
+
+Las camas disponibles pueden estar libres u ocupadas. Es a principios del mes de marzo donde inicia un aumento importante en la ocupación de las camas, disminuyendo por ende, la cantidad de camas libres. A principio del mes de junio fue cuando comenzó una disminución en las camas ocupadas. Los puntos representan los valores específicos en cada fecha y la línea permite visualizar la tendencia de la evolución en el tiempo de dicha variable.
+
+El incremento de la dotación de camas desde mediados de Marzo 2020 al `r as.character(max(base$last_edited_date), format = "%d %B %Y")` es del `r round(sum(ultimo.ingreso$dotación)/689*100, 1)`%. Son 689 la cantidad de camas para adultos en CTI y CI al inicio de la pandemia en Uruguay, el último registro muestra una dotación de `r sum(ultimo.ingreso$dotación)` camas. 
+
+
+\begin{center}
+Gráfico 4: Evolución en el tiempo de las camas disponibles, ocupadas y libres
+\end{center}
+
+\vspace*{-0.4cm}
+
+```{r , echo=FALSE, fig.height = 4, fig.width = 12, warning=FALSE, message=FALSE, fig.align="center"}
+
+ggplot(data = DF.SerieB, aes(x = Fecha, y = Freq, color = .)) + 
+     geom_point(stat="identity") + xlab("") + ylab("") + ylim(c(0,1100)) +
+     stat_smooth() +
+     theme(axis.text.x = element_text(angle = 0), legend.position="bottom", legend.text = element_text(size=12))
+
+```
+\vspace*{-0.4cm}
+
+\begin{center}
+Fuente: Área de Información en base a los datos del MIRA, Sinae
+\end{center}
+
+\newpage
+
+En el quinto gráfico se visualiza la evolución de las camas disponibles, la ocupación total existente y aquellas camas que se encuentran ocupadas por paciente con COVID específicamente.       
+Se distingue que la ocupación aumenta a partir de principios del mes de marzo cuando se incrementa la ocupación de las camas por pacientes con COVID principalmente, manteniendose sin variaciones significativas en el mes de mayo y disminuyendo progresivamente en el mes de junio.        
+     
+\begin{center}     
+Gráfico 5: Evolución en el tiempo de las camas de dotación, ocupadas y libres
+\end{center}
+
+\vspace*{-.7cm}
+
+```{r , echo=FALSE, fig.height = 4, fig.width = 12, warning=FALSE, message=FALSE, fig.align="center"}
+
+ggplot(data = DF.SerieA, aes(x = Fecha, y = Freq, color = .)) + 
+     geom_point(stat="identity") + xlab("") + ylab("") +
+     stat_smooth() +
+     theme(axis.text.x = element_text(angle = 0), legend.position="bottom", legend.text = element_text(size=12))
+
+```
+
+\vspace*{-.7cm}
+
+\begin{center}
+Fuente: Área de Información en base a los datos del MIRA, Sinae
+\end{center}
+
+
+Al observar los diferentes motivos de ocupación, se nota un mayor aumento de las camas ocupadas por pacientes con COVID respecto al incremento en la ocupación de camas por cualquier concepto, esto es debido a que comienza a disminuir en el mismo momento las camas ocupadas por pacientes con insuficiencia respiratoria aguda y también camas ocupadas por otros conceptos. Es a partir de principios del mes de junio donde comienza una disminución de camas ocupadas por pacientes con COVID y un aumento de las camas ocupadas por pacientes con insuficiencia respiratoria aguda.      
+
+
+\begin{center}
+Gráfico 6: Evolución en el tiempo de la ocupación de las camas
+\end{center}
+
+\vspace*{-.7cm}
+
+```{r , echo=FALSE, fig.height = 4, fig.width = 12, warning=FALSE, message=FALSE, fig.align = "center"}
+
+ggplot(data = DF.SerieD, aes(x = Fecha, y = Freq, color = .)) + 
+     geom_point(stat="identity") + xlab("") + ylab("") +
+     stat_smooth() +
+     theme(axis.text.x = element_text(angle = 0), legend.position="bottom", legend.text = element_text(size=12))
+
+```
+
+\vspace*{-.7cm}
+
+\begin{center}
+Fuente: Área de Información en base a los datos del MIRA, Sinae
+\end{center}
+
+Si bien se observó un gran crecimiento en el nivel de ocupación de camas de CTI y CI con pacientes con diagnóstico COVID positivo, el número de camas libres en todo el territorio nacional permaneció relativamente constante respecto a las demás variables. Esto se debe a las medidas regulatorias que se han tomado, logrando por un lado incrementar el número de camas de los centros de cuidados críticos y por otro disminuir la ocupación de camas por otras causas. Esto último seguramente explicado por la Ordenanza Ministerial Nº 37, del 15 de marzo de 2021, donde se resolvió postergar en todo el territorio nacional la puesta en marcha del Plan de Normalización de la Atención Médica hasta el 1º de mayo de 2021. autorizando a las instituciones asistenciales públicas y privadas a reprogramar por igual lapso la agenda de cirugías electivas no urgentes.        
+
+
+```{r serie2, echo=FALSE}
+
+base_ASSE <-subset(base2, servicios == "Público" & nombre != "HOSPITAL CENTRAL FF.AA." & 
+                              nombre != "HOSPITAL POLICIAL" & nombre != "UDELAR")
+
+base_Público <-subset(base2, servicios == "Público" & (nombre == "HOSPITAL CENTRAL FF.AA." | 
+                              nombre == "HOSPITAL POLICIAL" | nombre == "UDELAR"))
+
+base_Privado <-subset(base2, servicios == "Privado")
+
+Serie_ASSE <- base_ASSE %>%
+   group_by(last_edited_date) %>%
+   summarise(Ocupa_total = sum(Cama.ocup), Disponibles = sum(Disponibles), Ocup_COVID = sum(Ocup_COVID),
+             Dotación = sum(Dotación), Libres = sum(Libres), Bloqueadas = sum(Bloqueadas),
+             Ocupa_otros = sum(Ocup_otros), Ocupa_IRAG = sum(Ocup_IRAG))
+
+Serie_Público <- base_Público %>%
+   group_by(last_edited_date) %>%
+   summarise(Ocupa_total = sum(Cama.ocup), Disponibles = sum(Disponibles), Ocup_COVID = sum(Ocup_COVID),
+             Dotación = sum(Dotación), Libres = sum(Libres), Bloqueadas = sum(Bloqueadas),
+             Ocupa_otros = sum(Ocup_otros), Ocupa_IRAG = sum(Ocup_IRAG))
+
+Serie_Privado <- base_Privado %>%
+   group_by(last_edited_date) %>%
+   summarise(Ocupa_total = sum(Cama.ocup), Disponibles = sum(Disponibles), Ocup_COVID = sum(Ocup_COVID),
+             Dotación = sum(Dotación), Libres = sum(Libres), Bloqueadas = sum(Bloqueadas),
+             Ocupa_otros = sum(Ocup_otros), Ocupa_IRAG = sum(Ocup_IRAG))
+
+DF.Serie10 <- cbind(Serie_ASSE[ ,c(1,2)], rep("ASSE Ocupadas"))
+DF.Serie11 <- cbind(Serie_ASSE[ ,c(1,4)], rep("ASSE Ocupadas COVID"))
+DF.Serie12 <- cbind(Serie_Público[ ,c(1,2)], rep("Otros públicos Ocupadas"))
+DF.Serie13 <- cbind(Serie_Público[ ,c(1,4)], rep("Otros públicos Ocupadas COVID"))
+DF.Serie14 <- cbind(Serie_Privado[ ,c(1,2)], rep("Privados Ocupadas"))
+DF.Serie15 <- cbind(Serie_Privado[ ,c(1,4)], rep("Privados Ocupadas COVID"))
+
+colnames(DF.Serie10) <- c("Fecha","Freq", ".")
+colnames(DF.Serie11) <- c("Fecha","Freq", ".")
+colnames(DF.Serie12) <- c("Fecha","Freq", ".")
+colnames(DF.Serie13) <- c("Fecha","Freq", ".")
+colnames(DF.Serie14) <- c("Fecha","Freq", ".")
+colnames(DF.Serie15) <- c("Fecha","Freq", ".")
+
+DF.SerieServicios2 <- rbind(DF.Serie10[,], DF.Serie12[,], DF.Serie14[,])
+DF.SerieServicios1 <- rbind(DF.Serie11[,], DF.Serie13[,], DF.Serie15[,])
+DF.SerieServicios <- rbind(DF.Serie10[,], DF.Serie11[,], DF.Serie12[,], DF.Serie13[,], DF.Serie14[,], DF.Serie15[,])
+
+
+```
+
+
+En el mes de abril aumentó el número de centros de cuidados críticos pasando de 52 a 54. En ASSE se incorporaron los Centros de Terapia Intensiva del Hospital de Colonia y el Instituto Nacional de Traumatología. Este último constituye el Centro de COVID Nº 2 de Montevideo. La dotación de camas de cuidados críticos también se ha incorporado en los CTI tanto a nivel mutual como de otros centros de ASSE a partir de la entrega por parte del MSP de más de 200 equipos de ventilación mecánica y oxigenoterapia de alto flujo. 
+
+Finalmente, se presenta la evolución del número de camas ocupadas (gráfico 7) y del número de camas ocupadas con pacientes COVID positivo (gráfico 8), desagregando por tipo de sector. Por un lado se consideran a los centros de cuidados críticos de ASSE, por otros centros públicos (Hospital Central FF.AA., Hospital Policial y UdelaR) y a los centros de salud del sector privado.
+
+Se observa un crecimiento exponencial de la ocupación, explicado por el ingreso de pacientes con COVID positivo. En particular en el sector privado, el número de camas ocupadas con pacientes con este diagnóstico es de `r round(which(DF.SerieServicios1$"." == "Privados Ocupadas COVID" & DF.SerieServicios1$Fecha == "2021-07-01") / which(DF.SerieServicios1$"." == "Privados Ocupadas COVID" & DF.SerieServicios1$Fecha == "2021-03-01") * 100, 1)`% hasta la fecha.
+
+\begin{center}
+Gráfico 7: Evolución de las camas ocupadas según el servicio
+\end{center}
+
+\vspace*{-0.7cm}
+
+```{r , echo=FALSE, fig.height = 4.5, fig.width = 12, warning=FALSE, message=FALSE, fig.align = "center"}
+
+ggplot(data = DF.SerieServicios2, aes(x = Fecha, y = Freq, color = .)) + 
+     geom_point(stat="identity") + xlab("") + ylab("") +
+     stat_smooth() +
+     theme(axis.text.x = element_text(angle = 0), legend.position="bottom", legend.text = element_text(size=12))
+
+```
+
+\vspace*{-0.7cm}
+
+\begin{center}
+Fuente: Área de Información en base a los datos del MIRA, Sinae
+\end{center}
+
+
+\begin{center}
+Gráfico 8: Evolución de las camas ocupadas por paciente con COVID según el servicio
+\end{center}
+
+\vspace*{-0.7cm}
+
+```{r , echo=FALSE, fig.height = 4.5, fig.width = 12, warning=FALSE, message=FALSE, fig.align = "center"}
+
+ggplot(data = DF.SerieServicios1, aes(x = Fecha, y = Freq, color = .)) + 
+     geom_point(stat="identity") + xlab("") + ylab("") +
+     stat_smooth() +
+     theme(axis.text.x = element_text(angle = 0), legend.position="bottom", legend.text = element_text(size=12))
+
+```
+
+\vspace*{-0.7cm}
+
+\begin{center}
+Fuente: Área de Información en base a los datos del MIRA, Sinae
+\end{center}
+
+
+
+[^1]: Quienes fueron ingresados a CTI con diagnóstico de COVID positivo, que tienen el alta epidemiológica, pero siguen internados en cuidados críticos se contabilizan dentro de ésta categoría. Es una diferencia de criterio con los reportes generados por la Sociedad de Intensivistas del Uruguay (SUMI).
